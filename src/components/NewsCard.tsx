@@ -21,6 +21,7 @@ function sourceBadgeVariant(source: string): "default" | "secondary" | "outline"
 }
 
 export function NewsCard({ article }: { article: NewsArticle }) {
+    console.log(article)
   return (
     <Card className="flex flex-col h-full hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="pb-3">

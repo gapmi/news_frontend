@@ -25,13 +25,13 @@ export function NewsFilters({ search, onSearchChange, sources, activeSource, onS
             className="pl-9"
           />
         </div>
-        <Button variant="outline" className="relative" asChild>
+        {/* <Button variant="outline" className="relative" asChild>
           <label>
             <Upload className="w-4 h-4 mr-2" />
-            Загрузить JSON
+            Load JSON
             <input type="file" accept=".json" onChange={onFileUpload} className="sr-only" />
           </label>
-        </Button>
+        </Button> */}
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge
