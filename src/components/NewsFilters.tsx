@@ -1,6 +1,5 @@
-import { Search, Upload } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
@@ -9,29 +8,19 @@ interface Props {
   sources: string[];
   activeSource: string | null;
   onSourceChange: (v: string | null) => void;
-  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export function NewsFilters({ search, onSearchChange, sources, activeSource, onSourceChange, onFileUpload }: Props) {
+export function NewsFilters({ search, onSearchChange, sources, activeSource, onSourceChange }: Props) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by titles and description..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        {/* <Button variant="outline" className="relative" asChild>
-          <label>
-            <Upload className="w-4 h-4 mr-2" />
-            Load JSON
-            <input type="file" accept=".json" onChange={onFileUpload} className="sr-only" />
-          </label>
-        </Button> */}
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by titles and description..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-9"
+        />
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge

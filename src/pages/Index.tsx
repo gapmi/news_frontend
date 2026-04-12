@@ -1,53 +1,45 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Newspaper } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
 
+const API = "http://localhost:8000";
+
 const Index = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeSource, setActiveSource] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  // Загружаем список источников один раз
   useEffect(() => {
-
-    fetch("/news_output.json")
+    fetch(`${API}/sources`)
       .then((r) => r.json())
-      .then((data: NewsArticle[]) => setArticles(data))
+      .then((data) => setSources(data.sources))
       .catch(() => {});
   }, []);
 
-  const sources = useMemo(
-    () => [...new Set(articles.map((a) => a.source))],
-    [articles]
-  );
+  // Загружаем статьи при изменении фильтров
+  const fetchArticles = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (activeSource) params.set("source", activeSource);
+    params.set("limit", "200");
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return articles.filter((a) => {
-      const matchSource = !activeSource || a.source === activeSource;
-      const matchSearch =
-        !q ||
-        a.title.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q);
-      return matchSource && matchSearch;
-    });
-  }, [articles, search, activeSource]);
+    fetch(`${API}/articles?${params}`)
+      .then((r) => r.json())
+      .then((data) => setArticles(data.articles))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [search, activeSource]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result as string);
-        if (Array.isArray(data)) setArticles(data);
-      } catch {
-        /* ignore */
-      }
-    };
-    reader.readAsText(file);
-  };
+  useEffect(() => {
+    const timer = setTimeout(fetchArticles, 300); // debounce для поиска
+    return () => clearTimeout(timer);
+  }, [fetchArticles]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,16 +64,15 @@ const Index = () => {
           sources={sources}
           activeSource={activeSource}
           onSourceChange={setActiveSource}
-          onFileUpload={handleFileUpload}
         />
 
-        {filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12">
-            Nothing was found.
-          </p>
+        {loading ? (
+          <p className="text-center text-muted-foreground py-12">Loading...</p>
+        ) : articles.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12">Nothing was found.</p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((a, i) => (
+            {articles.map((a, i) => (
               <NewsCard key={a.url + i} article={a} />
             ))}
           </div>
