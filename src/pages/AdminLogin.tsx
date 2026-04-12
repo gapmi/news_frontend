@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock } from "lucide-react";
 
-const API = "http://159.198.43.22:3000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const AdminLogin = () => {
   const [username, setUsername] = useState("");
