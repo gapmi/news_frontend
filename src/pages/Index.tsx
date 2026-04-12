@@ -4,7 +4,7 @@ import { NewsCard } from "@/components/NewsCard";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
 
-const API = "hhttp://159.198.43.22:3000";
+const API = "http://159.198.43.22:3000";
 
 const Index = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
