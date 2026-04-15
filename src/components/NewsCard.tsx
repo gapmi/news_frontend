@@ -5,7 +5,7 @@ import type { NewsArticle } from "@/types/news";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString("ru-RU", {
+  return date.toLocaleDateString("en-En", {
     day: "numeric",
     month: "long",
     year: "numeric",

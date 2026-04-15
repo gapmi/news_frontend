@@ -180,7 +180,7 @@ const Admin = () => {
             {/* Форма добавления */}
             <div className="flex gap-2 flex-wrap">
               <Input
-                placeholder="Название"
+                placeholder="Name"
                 value={newSource.name}
                 onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
                 className="w-40"
