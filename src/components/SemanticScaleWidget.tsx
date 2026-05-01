@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SemanticScale } from "@/types/news";
 import {
   Select,
@@ -87,6 +87,17 @@ export function SemanticScaleWidget({
 
   const [selectedId, setSelectedId] = useState(primary?.id ?? "");
 
+  // синхронизируем выбранную шкалу, когда поменялись данные статьи
+  useEffect(() => {
+    if (primary?.id) {
+      setSelectedId(primary.id);
+    } else if (safeScales[0]?.id) {
+      setSelectedId(safeScales[0].id);
+    } else {
+      setSelectedId("");
+    }
+  }, [primary?.id, safeScales]);
+
   const selected =
     safeScales.find((scale) => scale.id === selectedId) ?? primary;
 
@@ -102,7 +113,7 @@ export function SemanticScaleWidget({
 
   return (
     <div className="ml-auto w-[168px] shrink-0">
-      <Select value={selected.id} onValueChange={setSelectedId}>
+      <Select value={selectedId} onValueChange={setSelectedId}>
         <SelectTrigger className="h-8 w-full text-xs">
           <SelectValue placeholder={meta.label} />
         </SelectTrigger>
