@@ -6,6 +6,13 @@ import type { NewsArticle } from "@/types/news";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const ITEMS_PER_PAGE = 30;
+const [page, setPage] = useState(1);
+const [total, setTotal] = useState(0);
+
+const totalPages = Math.max(
+  1,
+  Math.ceil(total / ITEMS_PER_PAGE),
+);
 
 const Index = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -23,19 +30,26 @@ const Index = () => {
   }, []);
 
   const fetchArticles = useCallback(() => {
-    setLoading(true);
+  setLoading(true);
 
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (activeSource) params.set("source", activeSource);
-    params.set("limit", "200");
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (activeSource) params.set("source", activeSource);
+  params.set("page", String(page));
+  params.set("page_size", String(ITEMS_PER_PAGE));
 
-    fetch(`${API}/articles?${params.toString()}`)
-      .then((r) => r.json())
-      .then((data) => setArticles(data.articles ?? []))
-      .catch(() => setArticles([]))
-      .finally(() => setLoading(false));
-  }, [search, activeSource]);
+  fetch(`${API}/articles?${params.toString()}`)
+    .then((r) => r.json())
+    .then((data) => {
+      setArticles(data.articles ?? []);
+      setTotal(data.total ?? 0);
+    })
+    .catch(() => {
+      setArticles([]);
+      setTotal(0);
+    })
+    .finally(() => setLoading(false));
+}, [search, activeSource, page]);
 
   useEffect(() => {
     const timer = setTimeout(fetchArticles, 300);
@@ -79,59 +93,42 @@ const Index = () => {
           onSourceChange={setActiveSource}
         />
 
-        <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {loading
-              ? "Loading articles..."
-              : `Showing ${showingFrom}-${showingTo} of ${articles.length} articles`}
-          </span>
+<div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
+  <span>
+    {loading
+      ? "Loading articles..."
+      : `Showing page ${page} of ${totalPages} (${total} total)`}
+  </span>
+</div>
 
-          {!loading && articles.length > 0 && (
-            <span>
-              Page {page} of {totalPages}
-            </span>
-          )}
-        </div>
+<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+  {articles.map((article) => (
+    <NewsCard key={article.id ?? article.url} article={article} />
+  ))}
+</div>
 
-        {loading ? (
-          <div className="py-12 text-center text-muted-foreground">
-            Loading articles...
-          </div>
-        ) : articles.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            No articles found
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {paginatedArticles.map((article) => (
-                <NewsCard key={article.id ?? article.url} article={article} />
-              ))}
-            </div>
+<div className="mt-8 flex items-center justify-center gap-3">
+  <button
+    onClick={() => setPage((p) => Math.max(1, p - 1))}
+    disabled={page === 1 || loading}
+    className="rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Previous
+  </button>
 
-            <div className="mt-8 flex items-center justify-center gap-3">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Previous
-              </button>
+  <span className="min-w-[120px] text-center text-sm text-muted-foreground">
+    Page {page} of {totalPages}
+  </span>
 
-              <span className="min-w-[120px] text-center text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
+  <button
+    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+    disabled={page === totalPages || loading}
+    className="rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Next
+  </button>
+</div>
 
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
