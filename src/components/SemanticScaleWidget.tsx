@@ -64,7 +64,7 @@ function getPrimaryScale(
   if (!scales.length) return null;
 
   if (primaryScaleId) {
-    const found = scales.find((s) => s.id === primaryScaleId);
+    const found = scales.find((s) => s.scale_id === primaryScaleId);
     if (found) return found;
   }
 
@@ -85,26 +85,25 @@ export function SemanticScaleWidget({
     [safeScales, primaryScaleId],
   );
 
-  const [selectedId, setSelectedId] = useState(primary?.id ?? "");
+  const [selectedId, setSelectedId] = useState(primary?.scale_id ?? "");
 
-  // синхронизируем выбранную шкалу, когда поменялись данные статьи
   useEffect(() => {
-    if (primary?.id) {
-      setSelectedId(primary.id);
-    } else if (safeScales[0]?.id) {
-      setSelectedId(safeScales[0].id);
+    if (primary?.scale_id) {
+      setSelectedId(primary.scale_id);
+    } else if (safeScales[0]?.scale_id) {
+      setSelectedId(safeScales[0].scale_id);
     } else {
       setSelectedId("");
     }
-  }, [primary?.id, safeScales]);
+  }, [primary?.scale_id, safeScales]);
 
   const selected =
-    safeScales.find((scale) => scale.id === selectedId) ?? primary;
+    safeScales.find((scale) => scale.scale_id === selectedId) ?? primary;
 
   if (!selected) return null;
 
-  const meta = SCALE_META[selected.id] ?? {
-    label: selected.id,
+  const meta = SCALE_META[selected.scale_id] ?? {
+    label: selected.scale_id,
     leftLabel: "Left",
     rightLabel: "Right",
   };
@@ -115,18 +114,18 @@ export function SemanticScaleWidget({
     <div className="ml-auto w-[168px] shrink-0">
       <Select value={selectedId} onValueChange={setSelectedId}>
         <SelectTrigger className="h-8 w-full text-xs">
-          <SelectValue />
+          <SelectValue placeholder={meta.label} />
         </SelectTrigger>
         <SelectContent>
           {safeScales.map((scale) => {
-            const itemMeta = SCALE_META[scale.id] ?? {
-              label: scale.id,
+            const itemMeta = SCALE_META[scale.scale_id] ?? {
+              label: scale.scale_id,
               leftLabel: "Left",
               rightLabel: "Right",
             };
 
             return (
-              <SelectItem key={scale.id} value={scale.id}>
+              <SelectItem key={scale.scale_id} value={scale.scale_id}>
                 {itemMeta.label}
               </SelectItem>
             );

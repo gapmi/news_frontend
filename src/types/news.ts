@@ -1,5 +1,5 @@
 export interface SemanticScale {
-  id: string;
+  scale_id: string;
   score: number;
   strength: number;
 }
