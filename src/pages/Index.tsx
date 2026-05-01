@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Newspaper } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { NewsFilters } from "@/components/NewsFilters";
@@ -6,13 +6,6 @@ import type { NewsArticle } from "@/types/news";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const ITEMS_PER_PAGE = 30;
-const [page, setPage] = useState(1);
-const [total, setTotal] = useState(0);
-
-const totalPages = Math.max(
-  1,
-  Math.ceil(total / ITEMS_PER_PAGE),
-);
 
 const Index = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -21,6 +14,7 @@ const Index = () => {
   const [activeSource, setActiveSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     fetch(`${API}/sources`)
@@ -30,26 +24,26 @@ const Index = () => {
   }, []);
 
   const fetchArticles = useCallback(() => {
-  setLoading(true);
+    setLoading(true);
 
-  const params = new URLSearchParams();
-  if (search) params.set("search", search);
-  if (activeSource) params.set("source", activeSource);
-  params.set("page", String(page));
-  params.set("page_size", String(ITEMS_PER_PAGE));
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (activeSource) params.set("source", activeSource);
+    params.set("page", String(page));
+    params.set("page_size", String(ITEMS_PER_PAGE));
 
-  fetch(`${API}/articles?${params.toString()}`)
-    .then((r) => r.json())
-    .then((data) => {
-      setArticles(data.articles ?? []);
-      setTotal(data.total ?? 0);
-    })
-    .catch(() => {
-      setArticles([]);
-      setTotal(0);
-    })
-    .finally(() => setLoading(false));
-}, [search, activeSource, page]);
+    fetch(`${API}/articles?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setArticles(data.articles ?? []);
+        setTotal(data.total ?? 0);
+      })
+      .catch(() => {
+        setArticles([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, [search, activeSource, page]);
 
   useEffect(() => {
     const timer = setTimeout(fetchArticles, 300);
@@ -58,17 +52,11 @@ const Index = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, activeSource, articles.length]);
+  }, [search, activeSource]);
 
-  const totalPages = Math.max(1, Math.ceil(articles.length / ITEMS_PER_PAGE));
-
-  const paginatedArticles = useMemo(() => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    return articles.slice(start, start + ITEMS_PER_PAGE);
-  }, [articles, page]);
-
-  const showingFrom = articles.length === 0 ? 0 : (page - 1) * ITEMS_PER_PAGE + 1;
-  const showingTo = Math.min(page * ITEMS_PER_PAGE, articles.length);
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const showingFrom = total === 0 ? 0 : (page - 1) * ITEMS_PER_PAGE + 1;
+  const showingTo = Math.min(page * ITEMS_PER_PAGE, total);
 
   return (
     <div className="min-h-screen bg-background">
@@ -93,42 +81,59 @@ const Index = () => {
           onSourceChange={setActiveSource}
         />
 
-<div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
-  <span>
-    {loading
-      ? "Loading articles..."
-      : `Showing page ${page} of ${totalPages} (${total} total)`}
-  </span>
-</div>
+        <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            {loading
+              ? "Loading articles..."
+              : `Showing ${showingFrom}-${showingTo} of ${total} articles`}
+          </span>
 
-<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-  {articles.map((article) => (
-    <NewsCard key={article.id ?? article.url} article={article} />
-  ))}
-</div>
+          {!loading && total > 0 && (
+            <span>
+              Page {page} of {totalPages}
+            </span>
+          )}
+        </div>
 
-<div className="mt-8 flex items-center justify-center gap-3">
-  <button
-    onClick={() => setPage((p) => Math.max(1, p - 1))}
-    disabled={page === 1 || loading}
-    className="rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    Previous
-  </button>
+        {loading ? (
+          <div className="py-12 text-center text-muted-foreground">
+            Loading articles...
+          </div>
+        ) : articles.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            No articles found
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {articles.map((article) => (
+                <NewsCard key={article.id ?? article.url} article={article} />
+              ))}
+            </div>
 
-  <span className="min-w-[120px] text-center text-sm text-muted-foreground">
-    Page {page} of {totalPages}
-  </span>
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
 
-  <button
-    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-    disabled={page === totalPages || loading}
-    className="rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    Next
-  </button>
-</div>
+              <span className="min-w-[120px] text-center text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
 
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+                className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
