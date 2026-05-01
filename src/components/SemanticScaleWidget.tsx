@@ -115,7 +115,7 @@ export function SemanticScaleWidget({
     <div className="ml-auto w-[168px] shrink-0">
       <Select value={selectedId} onValueChange={setSelectedId}>
         <SelectTrigger className="h-8 w-full text-xs">
-          <SelectValue placeholder={meta.label} />
+          <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {safeScales.map((scale) => {
