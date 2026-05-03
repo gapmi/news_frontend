@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SemanticScale } from "@/types/news";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -108,7 +109,28 @@ export function SemanticScaleWidget({
     rightLabel: "Right",
   };
 
-  const pointerLeft = `${((selected.score + 1) / 2) * 100}%`;
+  const zoomFactor = 2;
+  const visualScore = Math.max(-1, Math.min(1, selected.score * zoomFactor));
+  const pointerLeft = `${((visualScore + 1) / 2) * 100}%`;
+  const strength = Math.abs(selected.score);
+
+  const toneClass =
+    selected.score > 0
+      ? "bg-emerald-500"
+      : selected.score < 0
+        ? "bg-rose-500"
+        : "bg-slate-400";
+
+  const fillStyle =
+    selected.score >= 0
+      ? {
+          left: "50%",
+          width: `${Math.abs(visualScore) * 50}%`,
+        }
+      : {
+          left: `${50 - Math.abs(visualScore) * 50}%`,
+          width: `${Math.abs(visualScore) * 50}%`,
+        };
 
   return (
     <div className="ml-auto w-[168px] shrink-0">
@@ -136,10 +158,22 @@ export function SemanticScaleWidget({
       <div className="mt-2 space-y-1">
         <div className="relative h-2 rounded-full bg-muted">
           <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+            <div
+            className={cn(
+              "absolute inset-y-0 rounded-full opacity-70",
+              toneClass,
+            )}
+            style={fillStyle}
+            />
           <div
-            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background bg-primary shadow-sm"
-            style={{ left: pointerLeft }}
-            title={`${meta.label}: ${selected.score.toFixed(2)}`}
+           // className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background bg-primary shadow-sm"
+           className={cn(
+              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-sm",
+              toneClass,
+            )} 
+           style={{ left: pointerLeft }}
+            //title={`${meta.label}: ${selected.score.toFixed(2)}`}
+            title={`${meta.label}: ${selected.score.toFixed(2)} (strength ${strength.toFixed(2)})`}
           />
         </div>
 
@@ -148,6 +182,10 @@ export function SemanticScaleWidget({
           <span className="max-w-[64px] truncate text-right">
             {meta.rightLabel}
           </span>
+        </div>
+        <div className="text-center text-[10px] text-muted-foreground">
+          {selected.score > 0 ? "+" : ""}
+          {selected.score.toFixed(2)}
         </div>
       </div>
     </div>

@@ -48,9 +48,9 @@ export function NewsCard({ article }: { article: NewsArticle }) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        {article.description?(<p className="text-sm leading-relaxed text-muted-foreground">
           {article.description}
-        </p>
+        </p>):null}
       </CardContent>
 
       <CardFooter className="flex items-end gap-3">
