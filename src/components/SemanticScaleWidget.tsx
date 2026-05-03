@@ -125,14 +125,15 @@ export function SemanticScaleWidget({
           width: `${tailWidth}%`,
           clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
           background:
-            "linear-gradient(to right, rgba(148,163,184,0), rgba(100,116,139,0.55))",
+            
+            "linear-gradient(to right, rgba(100,116,139,0.55), rgba(148,163,184,0))",
         }
       : {
           left: `${pointerLeftPercent}%`,
           width: `${tailWidth}%`,
           clipPath: "polygon(0 0, 0 100%, 100% 50%)",
           background:
-            "linear-gradient(to right, rgba(100,116,139,0.55), rgba(148,163,184,0))",
+            "linear-gradient(to right, rgba(148,163,184,0), rgba(100,116,139,0.55))",
         };
 
   return (
