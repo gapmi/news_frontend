@@ -30,7 +30,7 @@ function sourceBadgeVariant(source: string): "default" | "secondary" | "outline"
 
 export function NewsCard({ article }: { article: NewsArticle }) {
   return (
-    <Card className="flex h-full flex-col hover:shadow-lg transition-shadow duration-200">
+    <Card className="flex h-full flex-col transition-shadow duration-200 hover:shadow-lg">
       <CardHeader className="pb-3">
         <div className="mb-2 flex items-center gap-2">
           <Badge variant={sourceBadgeVariant(article.source)}>
@@ -48,9 +48,11 @@ export function NewsCard({ article }: { article: NewsArticle }) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        {article.description?(<p className="text-sm leading-relaxed text-muted-foreground">
-          {article.description}
-        </p>):null}
+        {article.description ? (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {article.description}
+          </p>
+        ) : null}
       </CardContent>
 
       <CardFooter className="flex items-end gap-3">

@@ -111,25 +111,28 @@ export function SemanticScaleWidget({
 
   const zoomFactor = 2;
   const visualScore = Math.max(-1, Math.min(1, selected.score * zoomFactor));
-  const pointerLeft = `${((visualScore + 1) / 2) * 100}%`;
-  const strength = Math.abs(selected.score);
+  const pointerLeftPercent = ((visualScore + 1) / 2) * 100;
+  const pointerLeft = `${pointerLeftPercent}%`;
 
-  const toneClass =
-    selected.score > 0
-      ? "bg-emerald-500"
-      : selected.score < 0
-        ? "bg-rose-500"
-        : "bg-slate-400";
+  const centerPercent = 50;
+  const baseRadiusPx = 7;
+  const tailWidth = Math.abs(pointerLeftPercent - centerPercent);
 
-  const fillStyle =
-    selected.score >= 0
+  const tailStyle =
+    pointerLeftPercent >= centerPercent
       ? {
           left: "50%",
-          width: `${Math.abs(visualScore) * 50}%`,
+          width: `${tailWidth}%`,
+          clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
+          background:
+            "linear-gradient(to right, rgba(148,163,184,0), rgba(100,116,139,0.55))",
         }
       : {
-          left: `${50 - Math.abs(visualScore) * 50}%`,
-          width: `${Math.abs(visualScore) * 50}%`,
+          left: `${pointerLeftPercent}%`,
+          width: `${tailWidth}%`,
+          clipPath: "polygon(0 0, 0 100%, 100% 50%)",
+          background:
+            "linear-gradient(to right, rgba(100,116,139,0.55), rgba(148,163,184,0))",
         };
 
   return (
@@ -156,24 +159,30 @@ export function SemanticScaleWidget({
       </Select>
 
       <div className="mt-2 space-y-1">
-        <div className="relative h-2 rounded-full bg-muted">
-          <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+        <div className="relative h-4">
+          <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted" />
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+
+          {tailWidth > 0.5 ? (
             <div
-            className={cn(
-              "absolute inset-y-0 rounded-full opacity-70",
-              toneClass,
-            )}
-            style={fillStyle}
+              className="absolute top-1/2 h-3 -translate-y-1/2"
+              style={tailStyle}
             />
+          ) : null}
+
           <div
-           // className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background bg-primary shadow-sm"
-           className={cn(
-              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-sm",
-              toneClass,
-            )} 
-           style={{ left: pointerLeft }}
-            //title={`${meta.label}: ${selected.score.toFixed(2)}`}
-            title={`${meta.label}: ${selected.score.toFixed(2)} (strength ${strength.toFixed(2)})`}
+            className={cn(
+              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+              "border-2 border-background bg-foreground shadow-sm",
+            )}
+            style={{ left: pointerLeft, marginLeft: 0 }}
+            title={`${meta.label}: ${selected.score.toFixed(2)}`}
+          />
+
+          <div
+            className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/70 bg-background/80"
+            style={{ left: pointerLeft, width: baseRadiusPx * 2, height: baseRadiusPx * 2 }}
+            aria-hidden="true"
           />
         </div>
 
@@ -183,6 +192,7 @@ export function SemanticScaleWidget({
             {meta.rightLabel}
           </span>
         </div>
+
         <div className="text-center text-[10px] text-muted-foreground">
           {selected.score > 0 ? "+" : ""}
           {selected.score.toFixed(2)}
