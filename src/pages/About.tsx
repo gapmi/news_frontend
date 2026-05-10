@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 
 export function ScientificFoundationSection() {
   return (
@@ -94,6 +95,14 @@ export function ScientificFoundationSection() {
               social monitoring.
             </p>
           </section>
+          <div className="pt-4">
+            <Link
+                to="/"
+                className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+                Back to Home
+            </Link>
+            </div>
         </div>
       </div>
     </section>
