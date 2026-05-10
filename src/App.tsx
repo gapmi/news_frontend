@@ -7,6 +7,8 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLogin from "./pages/AdminLogin.tsx";
 import Admin from "./pages/Admin.tsx";
+import {ScientificFoundationSection as About} from  "./pages/About.tsx"
+import {ScientificFoundationSection as AboutRu} from  "./pages/AboutRu.tsx"
 
 const queryClient = new QueryClient();
 
@@ -21,6 +23,8 @@ const App = () => (
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/aboutRu" element={<AboutRu />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
