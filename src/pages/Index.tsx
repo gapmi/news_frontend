@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Newspaper } from "lucide-react";
+import { Rss } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
@@ -65,7 +65,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8 flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-3">
-              <Newspaper className="h-8 w-8 text-primary" />
+              <Rss className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">News Aggregator</h1>
@@ -83,7 +83,7 @@ const Index = () => {
             onSourceChange={setActiveSource}
           />
 
-          <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="my-4 flex items-center justify-between text-sm text-muted-foreground">
             <span>
               {loading
                 ? "Loading articles..."
