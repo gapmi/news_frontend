@@ -149,15 +149,6 @@ const Index = () => {
             About
           </Link>
         </div>
-        <div className="container mx-auto flex flex-col gap-3 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 News Aggregator. Semantic news mapping and monitoring.</p>
-          <Link
-            to="/aboutRu"
-            className="w-fit font-medium text-foreground transition-colors hover:text-primary"
-          >
-            About
-          </Link>
-        </div>
       </footer>
     </div>
   );
