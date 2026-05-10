@@ -136,69 +136,75 @@ export function SemanticScaleWidget({
             "linear-gradient(to right, rgba(148,163,184,0), rgba(100,116,139,0.55))",
         };
 
-  return (
-    <div className="ml-auto w-[168px] shrink-0">
-      <Select value={selectedId} onValueChange={setSelectedId}>
-        <SelectTrigger className="h-8 w-full text-xs">
-          <SelectValue placeholder={meta.label} />
-        </SelectTrigger>
-        <SelectContent>
-          {safeScales.map((scale) => {
-            const itemMeta = SCALE_META[scale.scale_id] ?? {
-              label: scale.scale_id,
-              leftLabel: "Left",
-              rightLabel: "Right",
-            };
+return (
+  <div className="ml-auto w-[180px] shrink-0">
+    <Select value={selectedId} onValueChange={setSelectedId}>
+      <SelectTrigger className="h-7 w-full border-border/70 bg-background text-[11px] uppercase tracking-[0.12em]">
+        <SelectValue placeholder={meta.label} />
+      </SelectTrigger>
+      <SelectContent>
+        {safeScales.map((scale) => {
+          const itemMeta = SCALE_META[scale.scale_id] ?? {
+            label: scale.scale_id,
+            leftLabel: "Left",
+            rightLabel: "Right",
+          };
 
-            return (
-              <SelectItem key={scale.scale_id} value={scale.scale_id}>
-                {itemMeta.label}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+          return (
+            <SelectItem
+              key={scale.scale_id}
+              value={scale.scale_id}
+              className="text-[11px] uppercase tracking-[0.12em]"
+            >
+              {itemMeta.label}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
 
-      <div className="mt-2 space-y-1">
-        <div className="relative h-4">
-          <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted" />
-          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+    <div className="mt-2 space-y-1">
+      <div className="relative h-4">
+        <div className="absolute left-0 right-0 top-1/2 h-[5px] -translate-y-1/2 rounded-full bg-muted" />
+        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border/80" />
 
-          {tailWidth > 0.5 ? (
-            <div
-              className="absolute top-1/2 h-3 -translate-y-1/2"
-              style={tailStyle}
-            />
-          ) : null}
-
+        {tailWidth > 0.5 ? (
           <div
-            className={cn(
-              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
-              "border-2 border-background bg-foreground shadow-sm",
-            )}
-            style={{ left: pointerLeft, marginLeft: 0 }}
-            title={`${meta.label}: ${selected.score.toFixed(2)}`}
+            className="absolute top-1/2 h-[9px] -translate-y-1/2"
+            style={tailStyle}
           />
+        ) : null}
 
-          <div
-            className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/70 bg-background/80"
-            style={{ left: pointerLeft, width: baseRadiusPx * 2, height: baseRadiusPx * 2 }}
-            aria-hidden="true"
-          />
-        </div>
+        <div
+          className={cn(
+            "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full",
+            "border border-background bg-foreground"
+          )}
+          style={{ left: pointerLeft, marginLeft: 0 }}
+          title={`${meta.label}: ${selected.score.toFixed(2)}`}
+        />
 
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span className="max-w-[64px] truncate">{meta.leftLabel}</span>
-          <span className="max-w-[64px] truncate text-right">
-            {meta.rightLabel}
-          </span>
-        </div>
+        <div
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/70 bg-background/80"
+          style={{
+            left: pointerLeft,
+          }}
+          aria-hidden="true"
+        />
+      </div>
 
-        <div className="text-center text-[10px] text-muted-foreground">
-          {selected.score > 0 ? "+" : ""}
-          {selected.score.toFixed(2)}
-        </div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        <span className="max-w-[72px] truncate">{meta.leftLabel}</span>
+        <span className="max-w-[72px] truncate text-right">
+          {meta.rightLabel}
+        </span>
+      </div>
+
+      <div className="text-center text-[10px] font-medium text-muted-foreground">
+        {meta.label}: {selected.score > 0 ? "+" : ""}
+        {selected.score.toFixed(2)}
       </div>
     </div>
-  );
+  </div>
+);
 }

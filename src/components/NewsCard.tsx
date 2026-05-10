@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SemanticScaleWidget } from "@/components/SemanticScaleWidget";
+
+import { cn } from "@/lib/utils";
 import type { NewsArticle } from "@/types/news";
 
 function formatDate(dateStr: string): string {
@@ -30,37 +32,54 @@ function sourceBadgeVariant(source: string): "default" | "secondary" | "outline"
 
 export function NewsCard({ article }: { article: NewsArticle }) {
   return (
-    <Card className="flex h-full flex-col transition-shadow duration-200 hover:shadow-lg">
-      <CardHeader className="pb-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Badge variant={sourceBadgeVariant(article.source)}>
+    <Card
+      className={cn(
+        "flex h-full flex-col border border-border/70 bg-background",
+        "shadow-none transition-colors duration-200",
+        "hover:border-foreground/60 hover:bg-muted/40"
+      )}
+    >
+      <CardHeader className="pb-2">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <Badge
+            variant={sourceBadgeVariant(article.source)}
+            className="border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] uppercase tracking-[0.08em]"
+          >
             <Rss className="mr-1 h-3 w-3" />
             {article.source}
           </Badge>
+
+          {article.primary_scale_id ? (
+            <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Semantic profile
+            </span>
+          ) : null}
         </div>
 
-        <CardTitle className="text-lg leading-snug">{article.title}</CardTitle>
+        <CardTitle className="text-[17px] font-semibold leading-snug tracking-tight">
+          {article.title}
+        </CardTitle>
 
-        <CardDescription className="flex items-center gap-1 text-xs">
+        <CardDescription className="mt-1 flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           <Clock className="h-3 w-3" />
           {formatDate(article.published)}
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="flex-1">
+      <CardContent className="flex-1 pt-1">
         {article.description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
             {article.description}
           </p>
         ) : null}
       </CardContent>
 
-      <CardFooter className="flex items-end gap-3">
+      <CardFooter className="flex items-end justify-between gap-3 border-t border-border/50 pt-2">
         <a
           href={article.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-1 text-sm text-primary hover:underline"
+          className="inline-flex shrink-0 items-center gap-1 text-[12px] uppercase tracking-[0.14em] text-primary hover:underline"
         >
           more..
           <ExternalLink className="h-3 w-3" />
