@@ -49,11 +49,11 @@ export function NewsCard({ article }: { article: NewsArticle }) {
             {article.source}
           </Badge>
 
-          {article.primary_scale_id ? (
+          {/* {article.primary_scale_id ? (
             <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               Semantic profile
             </span>
-          ) : null}
+          ) : null} */}
         </div>
 
         <CardTitle className="text-[17px] font-semibold leading-snug tracking-tight">
