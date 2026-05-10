@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Newspaper } from "lucide-react";
+import { Earth } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
@@ -63,7 +63,7 @@ const Index = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center gap-3">
           <div className="rounded-lg bg-primary/10 p-3">
-            <Newspaper className="h-8 w-8 text-primary" />
+            <Earth className="h-8 w-8 text-primary" />
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">News Aggregator</h1>
