@@ -18,25 +18,32 @@ export default function Topics() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/topics")
-      .then((res) => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/topics");
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        return res.json();
-      })
-      .then((json: Topic[]) => setTopics(json))
-      .catch((err) => setError(err.message || "Failed to load topics"))
-      .finally(() => setLoading(false));
+
+        const json = await res.json();
+        console.log("topics response:", json);
+
+        const normalizedTopics: Topic[] = Array.isArray(json)
+          ? json
+          : Array.isArray(json?.topics)
+          ? json.topics
+          : [];
+
+        setTopics(normalizedTopics);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load topics");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
-
-  if (loading) {
-    return <div className="p-6">Loading topics...</div>;
-  }
-
-  if (error) {
-    return <div className="p-6 text-red-600">Error: {error}</div>;
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -45,7 +52,7 @@ export default function Topics() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Topics</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Latest clustering run: {topics[0]?.started_at ?? "—"}
+              Total topics: {topics.length}
             </p>
           </div>
 
@@ -57,23 +64,33 @@ export default function Topics() {
           </Link>
         </div>
 
-        <div className="space-y-4">
-          {topics.map((topic) => (
-            <article
-              key={topic.cluster_id}
-              className="rounded-lg border bg-card p-4 shadow-sm"
-            >
-              <div className="mb-2 flex items-center justify-between gap-4 text-sm text-muted-foreground">
-                <span>Cluster #{topic.cluster_id}</span>
-                <span>{topic.size} articles</span>
-              </div>
+        {loading && <div className="p-4">Loading topics...</div>}
 
-              <h2 className="text-lg font-medium leading-snug">
-                {topic.representative_title}
-              </h2>
-            </article>
-          ))}
-        </div>
+        {error && <div className="p-4 text-red-600">Error: {error}</div>}
+
+        {!loading && !error && topics.length === 0 && (
+          <div className="p-4 text-muted-foreground">No topics found.</div>
+        )}
+
+        {!loading && !error && topics.length > 0 && (
+          <div className="space-y-4">
+            {topics.map((topic) => (
+              <article
+                key={topic.cluster_id}
+                className="rounded-lg border bg-card p-4 shadow-sm"
+              >
+                <div className="mb-2 flex items-center justify-between gap-4 text-sm text-muted-foreground">
+                  <span>Cluster #{topic.cluster_id}</span>
+                  <span>{topic.size} articles</span>
+                </div>
+
+                <h2 className="text-lg font-medium leading-snug">
+                  {topic.representative_title}
+                </h2>
+              </article>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
