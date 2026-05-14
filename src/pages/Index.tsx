@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Rss } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
+
+import { cn } from "@/lib/utils";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
 
@@ -74,19 +76,21 @@ const Index = () => {
               </p>
             </div>
           </div>
+        <div className="flex flex-wrap gap-2">
             <Link
-            to="/"
-            className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
-            >
-            Back to Topics
+                to="/"
+                className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
+                >
+                Back to Topics
             </Link>
-          <NewsFilters
-            sources={sources}
-            search={search}
-            onSearchChange={setSearch}
-            activeSource={activeSource}
-            onSourceChange={setActiveSource}
-          />
+                <NewsFilters
+                    sources={sources}
+                    search={search}
+                    onSearchChange={setSearch}
+                    activeSource={activeSource}
+                    onSourceChange={setActiveSource}
+                />
+        </div>
 
           <div className="my-4 flex items-center justify-between text-sm text-muted-foreground">
             <span>
