@@ -85,7 +85,12 @@ export default function Topics() {
                 </div>
 
                 <h2 className="text-lg font-medium leading-snug">
-                  {topic.representative_title}
+                <Link
+                    to={`/topics/${topic.cluster_id}`}
+                    className="transition-colors hover:text-primary"
+                >
+                    {topic.representative_title}
+                </Link>
                 </h2>
               </article>
             ))}

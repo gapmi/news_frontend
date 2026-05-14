@@ -9,6 +9,7 @@ import AdminLogin from "./pages/AdminLogin.tsx";
 import Admin from "./pages/Admin.tsx";
 import { ScientificFoundationSection as About } from "./pages/About.tsx";
 import Topics from "./pages/Topics.tsx";
+import TopicDetail from "./pages/TopicDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/topics" element={<Topics />} />
+          <Route path="/topics/:clusterId" element={<TopicDetail />} />
           <Route path="/about" element={<About />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
