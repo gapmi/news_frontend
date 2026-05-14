@@ -56,12 +56,20 @@ export default function Topics() {
             </p>
           </div>
 
-          <Link
-            to="/"
-            className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
-          >
-            Back to Home
-          </Link>
+          <div className="flex gap-2">
+            <Link
+                to="/articles"
+                className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
+            >
+                View Articles
+            </Link>
+            <Link
+                to="/about"
+                className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
+            >
+                About
+            </Link>
+            </div>
         </div>
 
         {loading && <div className="p-4">Loading topics...</div>}

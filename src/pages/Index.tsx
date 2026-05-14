@@ -74,7 +74,12 @@ const Index = () => {
               </p>
             </div>
           </div>
-
+            <Link
+            to="/"
+            className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
+            >
+            Back to Topics
+            </Link>
           <NewsFilters
             sources={sources}
             search={search}
