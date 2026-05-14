@@ -7,7 +7,8 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminLogin from "./pages/AdminLogin.tsx";
 import Admin from "./pages/Admin.tsx";
-import {ScientificFoundationSection as About} from  "./pages/About.tsx"
+import { ScientificFoundationSection as About } from "./pages/About.tsx";
+import Topics from "./pages/Topics.tsx";
 
 const queryClient = new QueryClient();
 
@@ -19,10 +20,11 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/topics" element={<Topics />} />
+          <Route path="/about" element={<About />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
-          <Route path="/about" element={<About />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
