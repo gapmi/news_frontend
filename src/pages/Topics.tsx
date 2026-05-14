@@ -12,13 +12,8 @@ type Topic = {
   finished_at: string;
 };
 
-type TopicsResponse = {
-  topics: Topic[];
-  total: number;
-};
-
 export default function Topics() {
-  const [data, setData] = useState<TopicsResponse | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +25,7 @@ export default function Topics() {
         }
         return res.json();
       })
-      .then((json) => setData(json))
+      .then((json: Topic[]) => setTopics(json))
       .catch((err) => setError(err.message || "Failed to load topics"))
       .finally(() => setLoading(false));
   }, []);
@@ -50,7 +45,7 @@ export default function Topics() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Topics</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Latest clustering run: {data?.topics?.[0]?.started_at ?? "—"}
+              Latest clustering run: {topics[0]?.started_at ?? "—"}
             </p>
           </div>
 
@@ -63,7 +58,7 @@ export default function Topics() {
         </div>
 
         <div className="space-y-4">
-          {data?.topics.map((topic) => (
+          {topics.map((topic) => (
             <article
               key={topic.cluster_id}
               className="rounded-lg border bg-card p-4 shadow-sm"
