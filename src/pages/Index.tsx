@@ -2,8 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Rss } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
-
-import { cn } from "@/lib/utils";
 import { NewsFilters } from "@/components/NewsFilters";
 import type { NewsArticle } from "@/types/news";
 
@@ -19,6 +17,8 @@ const Index = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const isSemanticSearch = search.trim().length > 0;
+
   useEffect(() => {
     fetch(`${API}/sources`)
       .then((r) => r.json())
@@ -29,8 +29,33 @@ const Index = () => {
   const fetchArticles = useCallback(() => {
     setLoading(true);
 
+    if (isSemanticSearch) {
+      const params = new URLSearchParams();
+      params.set("q", search.trim());
+      params.set("limit", String(ITEMS_PER_PAGE));
+
+      fetch(`${API}/search?${params.toString()}`)
+        .then((r) => r.json())
+        .then((data) => {
+          let items: NewsArticle[] = data.articles ?? [];
+
+          if (activeSource) {
+            items = items.filter((article) => article.source === activeSource);
+          }
+
+          setArticles(items);
+          setTotal(items.length);
+        })
+        .catch(() => {
+          setArticles([]);
+          setTotal(0);
+        })
+        .finally(() => setLoading(false));
+
+      return;
+    }
+
     const params = new URLSearchParams();
-    if (search) params.set("search", search);
     if (activeSource) params.set("source", activeSource);
     params.set("page", String(page));
     params.set("page_size", String(ITEMS_PER_PAGE));
@@ -46,7 +71,7 @@ const Index = () => {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, [search, activeSource, page]);
+  }, [search, activeSource, page, isSemanticSearch]);
 
   useEffect(() => {
     const timer = setTimeout(fetchArticles, 300);
@@ -57,9 +82,14 @@ const Index = () => {
     setPage(1);
   }, [search, activeSource]);
 
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const totalPages = isSemanticSearch
+    ? 1
+    : Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+
   const showingFrom = total === 0 ? 0 : (page - 1) * ITEMS_PER_PAGE + 1;
-  const showingTo = Math.min(page * ITEMS_PER_PAGE, total);
+  const showingTo = isSemanticSearch
+    ? total
+    : Math.min(page * ITEMS_PER_PAGE, total);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -76,30 +106,36 @@ const Index = () => {
               </p>
             </div>
           </div>
-        <div className="flex flex-wrap gap-2">
-            <Link
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Link
                 to="/"
                 className="inline-flex rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted"
-                >
+              >
                 Back to Topics
-            </Link>
-                <NewsFilters
-                    sources={sources}
-                    search={search}
-                    onSearchChange={setSearch}
-                    activeSource={activeSource}
-                    onSourceChange={setActiveSource}
-                />
-        </div>
+              </Link>
+            </div>
+
+            <NewsFilters
+              sources={sources}
+              search={search}
+              onSearchChange={setSearch}
+              activeSource={activeSource}
+              onSourceChange={setActiveSource}
+            />
+          </div>
 
           <div className="my-4 flex items-center justify-between text-sm text-muted-foreground">
             <span>
               {loading
                 ? "Loading articles..."
-                : `Showing ${showingFrom}-${showingTo} of ${total} articles`}
+                : isSemanticSearch
+                  ? `Semantic search: ${total} results`
+                  : `Showing ${showingFrom}-${showingTo} of ${total} articles`}
             </span>
 
-            {!loading && total > 0 && (
+            {!loading && total > 0 && !isSemanticSearch && (
               <span>
                 Page {page} of {totalPages}
               </span>
@@ -122,27 +158,29 @@ const Index = () => {
                 ))}
               </div>
 
-              <div className="mt-8 flex items-center justify-center gap-3">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1 || loading}
-                  className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Previous
-                </button>
+              {!isSemanticSearch && (
+                <div className="mt-8 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1 || loading}
+                    className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
 
-                <span className="min-w-[120px] text-center text-sm text-muted-foreground">
-                  Page {page} of {totalPages}
-                </span>
+                  <span className="min-w-[120px] text-center text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </span>
 
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages || loading}
-                  className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages || loading}
+                    className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
