@@ -10,6 +10,7 @@ import Admin from "./pages/Admin.tsx";
 import { ScientificFoundationSection as About } from "./pages/About.tsx";
 import Topics from "./pages/Topics.tsx";
 import TopicDetail from "./pages/TopicDetail.tsx";
+import Lineage from "./pages/Lineage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
+          <Route path="/lineage" element={<Lineage />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
