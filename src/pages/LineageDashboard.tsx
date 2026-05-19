@@ -9,6 +9,7 @@ import {
   type LineageEdge,
 } from "@/api/clustering";
 import LineageFlow from "@/components/charts/LineageFlow";
+import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -476,6 +477,9 @@ export default function LineageDashboard() {
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-lg font-medium">Euler detail</h2>
 
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-lg font-medium">Euler detail</h2>
+
             {!selectedEdgeId && (
               <p className="mt-3 text-sm text-muted-foreground">
                 Click a lineage edge to inspect overlap between the parent and child
@@ -495,31 +499,10 @@ export default function LineageDashboard() {
 
             {eulerQuery.data && (
               <div className="mt-4 grid gap-4">
-                <div>
-                  <h3 className="font-medium">{eulerQuery.data.labels.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {eulerQuery.data.labels.subtitle}
-                  </p>
-                  <p className="mt-3 text-sm">{eulerQuery.data.labels.explanation}</p>
-                </div>
-
-                <dl className="space-y-2 text-sm">
-                  <div>Parent size: {eulerQuery.data.parent.size}</div>
-                  <div>Child size: {eulerQuery.data.child.size}</div>
-                  <div>Overlap: {eulerQuery.data.overlap.count}</div>
-                  <div>
-                    Parent coverage: {formatNumber(eulerQuery.data.overlap.parentCoverage)}
-                  </div>
-                  <div>
-                    Child coverage: {formatNumber(eulerQuery.data.overlap.childCoverage)}
-                  </div>
-                  <div>Union size: {eulerQuery.data.overlap.unionSize}</div>
-                  <div>Jaccard: {formatNumber(eulerQuery.data.overlap.jaccard)}</div>
-                  <div>Similarity: {formatNumber(eulerQuery.data.metrics.similarity)}</div>
-                  <div>Score: {formatNumber(eulerQuery.data.metrics.score)}</div>
-                </dl>
+                ...
               </div>
             )}
+          </div>
           </div>
         </section>
       </main>
