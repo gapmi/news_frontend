@@ -14,9 +14,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function circleOverlapArea(r1: number, r2: number, d: number) {
-  if (d >= r1 + r2) {
-    return 0;
-  }
+  if (d >= r1 + r2) return 0;
 
   if (d <= Math.abs(r1 - r2)) {
     const r = Math.min(r1, r2);
@@ -49,18 +47,13 @@ function circleOverlapArea(r1: number, r2: number, d: number) {
 function solveCircleDistance(r1: number, r2: number, targetOverlap: number) {
   const maxOverlap = Math.PI * Math.min(r1, r2) ** 2;
 
-  if (targetOverlap <= 0) {
-    return r1 + r2 + 8;
-  }
-
-  if (targetOverlap >= maxOverlap) {
-    return Math.abs(r1 - r2);
-  }
+  if (targetOverlap <= 0) return r1 + r2 + 12;
+  if (targetOverlap >= maxOverlap) return Math.abs(r1 - r2);
 
   let low = Math.abs(r1 - r2);
   let high = r1 + r2;
 
-  for (let i = 0; i < 56; i += 1) {
+  for (let i = 0; i < 60; i += 1) {
     const mid = (low + high) / 2;
     const overlap = circleOverlapArea(r1, r2, mid);
 
@@ -84,43 +77,26 @@ export default function EulerOverlapDiagram({ detail }: Props) {
       Math.min(parentArea, childArea),
     );
 
-    const baseScale = 10;
-    const rawParentRadius = Math.sqrt(parentArea / Math.PI) * baseScale;
-    const rawChildRadius = Math.sqrt(childArea / Math.PI) * baseScale;
-    const rawDistance = solveCircleDistance(
-      rawParentRadius,
-      rawChildRadius,
-      intersectionArea,
+    const rawParentRadius = Math.sqrt(parentArea / Math.PI);
+    const rawChildRadius = Math.sqrt(childArea / Math.PI);
+
+    const minVisualRadius = 42;
+    const areaScale = 26;
+
+    const parentRadius = Math.max(minVisualRadius, rawParentRadius * areaScale);
+    const childRadius = Math.max(minVisualRadius, rawChildRadius * areaScale);
+
+    const distance = solveCircleDistance(
+      parentRadius,
+      childRadius,
+      intersectionArea * areaScale * areaScale,
     );
 
-    const width = 720;
-    const height = 420;
-
-    const horizontalPadding = 70;
-    const topPadding = 110;
-    const bottomPadding = 60;
-
-    const rawLeft = 220 - rawParentRadius;
-    const rawRight = 220 + rawDistance + rawChildRadius;
-    const rawDiagramWidth = rawRight - rawLeft;
-    const rawDiagramHeight = Math.max(rawParentRadius, rawChildRadius) * 2;
-
-    const usableWidth = width - horizontalPadding * 2;
-    const usableHeight = height - topPadding - bottomPadding;
-
-    const scale = Math.min(
-      usableWidth / Math.max(rawDiagramWidth, 1),
-      usableHeight / Math.max(rawDiagramHeight, 1),
-      1.35,
-    );
-
-    const parentRadius = rawParentRadius * scale;
-    const childRadius = rawChildRadius * scale;
-    const distance = rawDistance * scale;
-
-    const centerY = topPadding + usableHeight / 2;
-    const parentCx = width / 2 - distance / 2;
-    const childCx = width / 2 + distance / 2;
+    const width = 520;
+    const height = 260;
+    const centerY = 130;
+    const parentCx = 210;
+    const childCx = parentCx + distance;
 
     return {
       width,
@@ -137,17 +113,37 @@ export default function EulerOverlapDiagram({ detail }: Props) {
 
   return (
     <div className="rounded-lg border bg-background p-4">
-      <div className="mb-3">
+      <div className="mb-4">
         <h3 className="text-base font-medium">{detail.labels.title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           {detail.labels.subtitle}
         </p>
       </div>
 
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border bg-blue-50 px-3 py-2">
+          <div className="text-sm font-semibold text-blue-700">
+            Parent C{detail.parent.clusterId}
+          </div>
+          <div className="text-xs text-blue-700/80">
+            size {detail.parent.size}
+          </div>
+        </div>
+
+        <div className="rounded-md border bg-violet-50 px-3 py-2">
+          <div className="text-sm font-semibold text-violet-700">
+            Child C{detail.child.clusterId}
+          </div>
+          <div className="text-xs text-violet-700/80">
+            size {detail.child.size}
+          </div>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${diagram.width} ${diagram.height}`}
-          className="h-auto w-full min-w-[520px]"
+          className="h-auto w-full min-w-[420px]"
           role="img"
           aria-label={`Euler overlap for parent cluster ${detail.parent.clusterId} and child cluster ${detail.child.clusterId}`}
         >
@@ -192,48 +188,8 @@ export default function EulerOverlapDiagram({ detail }: Props) {
           </g>
 
           <text
-            x={diagram.parentCx}
-            y={38}
-            textAnchor="middle"
-            fontSize="18"
-            fontWeight="700"
-            fill="#1d4ed8"
-          >
-            {`Parent C${detail.parent.clusterId}`}
-          </text>
-          <text
-            x={diagram.parentCx}
-            y={62}
-            textAnchor="middle"
-            fontSize="14"
-            fill="#1e40af"
-          >
-            {`size ${detail.parent.size}`}
-          </text>
-
-          <text
-            x={diagram.childCx}
-            y={38}
-            textAnchor="middle"
-            fontSize="18"
-            fontWeight="700"
-            fill="#6d28d9"
-          >
-            {`Child C${detail.child.clusterId}`}
-          </text>
-          <text
-            x={diagram.childCx}
-            y={62}
-            textAnchor="middle"
-            fontSize="14"
-            fill="#6d28d9"
-          >
-            {`size ${detail.child.size}`}
-          </text>
-
-          <text
             x={overlapCenterX}
-            y={diagram.centerY - 4}
+            y={diagram.centerY - 2}
             textAnchor="middle"
             fontSize="26"
             fontWeight="800"
@@ -243,9 +199,9 @@ export default function EulerOverlapDiagram({ detail }: Props) {
           </text>
           <text
             x={overlapCenterX}
-            y={diagram.centerY + 20}
+            y={diagram.centerY + 18}
             textAnchor="middle"
-            fontSize="13"
+            fontSize="12"
             fill="#4b5563"
           >
             overlap
