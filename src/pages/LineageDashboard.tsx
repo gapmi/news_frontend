@@ -372,6 +372,7 @@ export default function LineageDashboard() {
                 "No valid lineage pair available"
               )}
             </div>
+          </div>
 
             <LineageFlow
                 edges={edges}
@@ -380,9 +381,6 @@ export default function LineageDashboard() {
                 selectedEdgeId={selectedEdgeId}
                 onSelectEdge={setSelectedEdgeId}
             />
-
-          </div>
-
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
