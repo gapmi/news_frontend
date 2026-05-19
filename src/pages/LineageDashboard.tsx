@@ -18,6 +18,11 @@ function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
+type RunPair = {
+  parentRunId: number;
+  childRunId: number;
+};
+
 export default function LineageDashboard() {
   const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
@@ -51,7 +56,7 @@ export default function LineageDashboard() {
     return [...new Set(lineageRuns.map((run) => run.runId))].sort((a, b) => a - b);
   }, [lineageRuns]);
 
-  const availablePairs = useMemo(() => {
+  const availablePairs = useMemo<RunPair[]>(() => {
     if (sortedLineageRunIds.length < 2) {
       return [];
     }
@@ -67,6 +72,7 @@ export default function LineageDashboard() {
 
   useEffect(() => {
     if (availablePairs.length === 0) {
+      setPairIndex(0);
       return;
     }
 
@@ -75,11 +81,74 @@ export default function LineageDashboard() {
 
   const activePair = availablePairs[pairIndex] ?? null;
 
+  const parentOptions = useMemo(() => {
+    return [...new Set(availablePairs.map((pair) => pair.parentRunId))];
+  }, [availablePairs]);
+
   const parentRunId = manualParentRunId ?? activePair?.parentRunId ?? null;
-  const childRunId = manualChildRunId ?? activePair?.childRunId ?? null;
+
+  const childOptions = useMemo(() => {
+    if (!parentRunId) {
+      return [];
+    }
+
+    return availablePairs
+      .filter((pair) => pair.parentRunId === parentRunId)
+      .map((pair) => pair.childRunId);
+  }, [availablePairs, parentRunId]);
+
+  const childRunId = useMemo(() => {
+    if (manualChildRunId !== null && childOptions.includes(manualChildRunId)) {
+      return manualChildRunId;
+    }
+
+    if (
+      activePair &&
+      activePair.parentRunId === parentRunId &&
+      childOptions.includes(activePair.childRunId)
+    ) {
+      return activePair.childRunId;
+    }
+
+    return childOptions[0] ?? null;
+  }, [manualChildRunId, childOptions, activePair, parentRunId]);
+
+  useEffect(() => {
+    if (parentRunId === null) {
+      setManualChildRunId(null);
+      return;
+    }
+
+    if (childOptions.length === 0) {
+      setManualChildRunId(null);
+      return;
+    }
+
+    if (childRunId === null || !childOptions.includes(childRunId)) {
+      setManualChildRunId(childOptions[0]);
+    }
+  }, [parentRunId, childOptions, childRunId]);
+
+  useEffect(() => {
+    if (parentRunId === null || childRunId === null) {
+      return;
+    }
+
+    const nextIndex = availablePairs.findIndex(
+      (pair) =>
+        pair.parentRunId === parentRunId && pair.childRunId === childRunId,
+    );
+
+    if (nextIndex >= 0) {
+      setPairIndex(nextIndex);
+    }
+  }, [availablePairs, parentRunId, childRunId]);
 
   const edgeParams =
-    parentRunId && childRunId && parentRunId < childRunId
+    parentRunId !== null &&
+    childRunId !== null &&
+    parentRunId < childRunId &&
+    childOptions.includes(childRunId)
       ? {
           parent_run_id: parentRunId,
           child_run_id: childRunId,
@@ -111,31 +180,22 @@ export default function LineageDashboard() {
 
   const edges = edgesQuery.data?.items ?? [];
 
-  const canStepBackward =
-    manualParentRunId === null &&
-    manualChildRunId === null &&
-    pairIndex > 0;
-
+  const canStepBackward = availablePairs.length > 0 && pairIndex > 0;
   const canStepForward =
-    manualParentRunId === null &&
-    manualChildRunId === null &&
-    pairIndex < availablePairs.length - 1;
+    availablePairs.length > 0 && pairIndex < availablePairs.length - 1;
 
-  function syncPairIndex(nextParentRunId: number, nextChildRunId: number) {
-    const nextIndex = availablePairs.findIndex(
-      (pair) =>
-        pair.parentRunId === nextParentRunId &&
-        pair.childRunId === nextChildRunId,
-    );
+  function stepToPair(nextIndex: number) {
+    const boundedIndex = Math.max(0, Math.min(nextIndex, availablePairs.length - 1));
+    const nextPair = availablePairs[boundedIndex];
 
-    if (nextIndex >= 0) {
-      setPairIndex(nextIndex);
-      setManualParentRunId(null);
-      setManualChildRunId(null);
-    } else {
-      setManualParentRunId(nextParentRunId);
-      setManualChildRunId(nextChildRunId);
+    if (!nextPair) {
+      return;
     }
+
+    setPairIndex(boundedIndex);
+    setManualParentRunId(null);
+    setManualChildRunId(null);
+    setSelectedEdgeId(null);
   }
 
   return (
@@ -216,13 +276,18 @@ export default function LineageDashboard() {
                 value={parentRunId ?? ""}
                 onChange={(event) => {
                   const nextParentRunId = Number(event.target.value);
-                  syncPairIndex(nextParentRunId, childRunId ?? nextParentRunId + 1);
+                  const nextChildOptions = availablePairs
+                    .filter((pair) => pair.parentRunId === nextParentRunId)
+                    .map((pair) => pair.childRunId);
+
+                  setManualParentRunId(nextParentRunId);
+                  setManualChildRunId(nextChildOptions[0] ?? null);
                   setSelectedEdgeId(null);
                 }}
               >
-                {runs.map((run) => (
-                  <option key={run.runId} value={run.runId}>
-                    Run {run.runId}
+                {parentOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
                   </option>
                 ))}
               </select>
@@ -234,14 +299,14 @@ export default function LineageDashboard() {
                 className="rounded-md border bg-background px-3 py-2"
                 value={childRunId ?? ""}
                 onChange={(event) => {
-                  const nextChildRunId = Number(event.target.value);
-                  syncPairIndex(parentRunId ?? nextChildRunId - 1, nextChildRunId);
+                  setManualChildRunId(Number(event.target.value));
                   setSelectedEdgeId(null);
                 }}
+                disabled={childOptions.length === 0}
               >
-                {runs.map((run) => (
-                  <option key={run.runId} value={run.runId}>
-                    Run {run.runId}
+                {childOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
                   </option>
                 ))}
               </select>
@@ -264,17 +329,15 @@ export default function LineageDashboard() {
             </label>
 
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              {parentRunId && childRunId ? (
+              {parentRunId !== null && childRunId !== null ? (
                 <div className="space-y-1">
                   <div>{`Selected pair: ${parentRunId} → ${childRunId}`}</div>
                   <div className="text-xs text-muted-foreground">
-                    {parentRunId < childRunId
-                      ? "Lineage table shows edges between these runs"
-                      : "Choose a child run greater than the parent run"}
+                    Lineage table shows edges between these runs
                   </div>
                 </div>
               ) : (
-                "No lineage pair available"
+                "No valid lineage pair available"
               )}
             </div>
           </div>
@@ -283,12 +346,7 @@ export default function LineageDashboard() {
             <button
               type="button"
               className="rounded-md border bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => {
-                setPairIndex((current) => Math.max(current - 1, 0));
-                setManualParentRunId(null);
-                setManualChildRunId(null);
-                setSelectedEdgeId(null);
-              }}
+              onClick={() => stepToPair(pairIndex - 1)}
               disabled={!canStepBackward}
             >
               Previous pair
@@ -297,14 +355,7 @@ export default function LineageDashboard() {
             <button
               type="button"
               className="rounded-md border bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => {
-                setPairIndex((current) =>
-                  Math.min(current + 1, availablePairs.length - 1),
-                );
-                setManualParentRunId(null);
-                setManualChildRunId(null);
-                setSelectedEdgeId(null);
-              }}
+              onClick={() => stepToPair(pairIndex + 1)}
               disabled={!canStepForward}
             >
               Next pair
