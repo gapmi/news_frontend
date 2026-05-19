@@ -59,8 +59,30 @@ export interface RunSummary {
   articleCount: number;
   clusterCount: number;
   noiseCount: number;
+  largestClusterSize: number;
+  largestClusterRatio: number;
+  noiseRatio: number;
+  maxPerSource: number | null;
   parentLineageEdgeCount: number;
   childLineageEdgeCount: number;
+}
+
+export interface PipelineRun {
+  id: number;
+  jobType: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  relatedRunId: number | null;
+  error: string | null;
+  meta: Record<string, unknown>;
+}
+
+export interface PipelineRunsParams {
+  limit?: number;
+  offset?: number;
+  job_type?: string;
+  status?: string;
 }
 
 export interface ArticlePreview {
@@ -315,6 +337,8 @@ export const clusteringKeys = {
     [...clusteringKeys.all, "views", "graph", params] as const,
   euler: (edgeId: number) =>
     [...clusteringKeys.all, "views", "euler", edgeId] as const,
+  pipelineRuns: (params: PipelineRunsParams = {}) =>
+    [...clusteringKeys.all, "pipeline", "runs", params] as const,
 };
 
 export function getClusteringRuns(params: RunsParams = {}) {
@@ -356,5 +380,11 @@ export function getGraphView(params: GraphParams) {
 export function getEulerPairDetail(edgeId: number) {
   return fetchJson<EulerPairDetail>(
     `/v1/clustering/views/euler/${edgeId}`,
+  );
+}
+
+export function getPipelineRuns(params: PipelineRunsParams = {}) {
+  return fetchJson<PaginatedResponse<PipelineRun>>(
+    `/v1/clustering/pipeline/runs${buildQuery(params)}`,
   );
 }
