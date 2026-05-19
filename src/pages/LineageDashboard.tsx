@@ -19,8 +19,10 @@ function formatNumber(value: number, digits = 2) {
 }
 
 export default function LineageDashboard() {
-  const [manualStartRunId, setManualStartRunId] = useState<number | null>(null);
-  const [manualEndRunId, setManualEndRunId] = useState<number | null>(null);
+  const [manualParentRunId, setManualParentRunId] = useState<number | null>(
+    null,
+  );
+  const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
 
@@ -46,27 +48,31 @@ export default function LineageDashboard() {
     );
   }, [runs]);
 
-  const defaultRange = useMemo(() => {
+  // Находим минимальный и максимальный runId среди runs с lineage
+  const defaultPair = useMemo(() => {
     if (lineageRuns.length === 0) {
       return null;
     }
-
     const ids = lineageRuns.map((run) => run.runId);
-
+    const minId = Math.min(...ids);
+    const maxId = Math.max(...ids);
+    if (minId >= maxId) {
+      return null;
+    }
     return {
-      startRunId: Math.min(...ids),
-      endRunId: Math.max(...ids),
+      parentRunId: minId,
+      childRunId: minId + 1,
     };
   }, [lineageRuns]);
 
-  const startRunId = manualStartRunId ?? defaultRange?.startRunId ?? null;
-  const endRunId = manualEndRunId ?? defaultRange?.endRunId ?? null;
+  const parentRunId = manualParentRunId ?? defaultPair?.parentRunId ?? null;
+  const childRunId = manualChildRunId ?? defaultPair?.childRunId ?? null;
 
   const edgeParams =
-    startRunId && endRunId && startRunId < endRunId
+    parentRunId && childRunId && parentRunId < childRunId
       ? {
-          parent_run_id: startRunId,
-          child_run_id: startRunId + 1,
+          parent_run_id: parentRunId,
+          child_run_id: childRunId,
           min_score: minScore,
           limit: 50,
         }
@@ -105,8 +111,9 @@ export default function LineageDashboard() {
                 News Market Lineage Dashboard
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Explore cluster evolution across runs with Sankey flow, graph topology,
-                Euler overlap detail, run quality metrics, and pipeline health.
+                Explore cluster evolution across runs with Sankey flow, graph
+                topology, Euler overlap detail, run quality metrics, and
+                pipeline health.
               </p>
             </div>
 
@@ -155,7 +162,9 @@ export default function LineageDashboard() {
                   {latestPipelineRun?.status ?? "—"}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Last start: {formatDateTime(latestPipelineRun?.startedAt ?? null)}
+                  Last start: {formatDateTime(
+                    latestPipelineRun?.startedAt ?? null,
+                  )}
                 </div>
               </div>
             </div>
@@ -167,12 +176,12 @@ export default function LineageDashboard() {
 
           <div className="mt-4 grid gap-4 md:grid-cols-4">
             <label className="flex flex-col gap-2 text-sm">
-              Start run
+              Parent run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={startRunId ?? ""}
+                value={parentRunId ?? ""}
                 onChange={(event) => {
-                  setManualStartRunId(Number(event.target.value));
+                  setManualParentRunId(Number(event.target.value));
                   setSelectedEdgeId(null);
                 }}
               >
@@ -185,12 +194,12 @@ export default function LineageDashboard() {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              End run
+              Child run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={endRunId ?? ""}
+                value={childRunId ?? ""}
                 onChange={(event) => {
-                  setManualEndRunId(Number(event.target.value));
+                  setManualChildRunId(Number(event.target.value));
                   setSelectedEdgeId(null);
                 }}
               >
@@ -219,18 +228,18 @@ export default function LineageDashboard() {
             </label>
 
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            {startRunId && endRunId ? (
+              {parentRunId && childRunId ? (
                 <div className="space-y-1">
-                <div>{`Selected range: ${startRunId} → ${endRunId}`}</div>
-                <div className="text-xs text-muted-foreground">
-                    {startRunId < endRunId
-                    ? `Current table pair: ${startRunId} → ${startRunId + 1}`
-                    : "Choose an end run greater than the start run"}
+                  <div>{`Selected pair: ${parentRunId} → ${childRunId}`}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {parentRunId < childRunId
+                      ? "Lineage table shows edges between these runs"
+                      : "Choose a child run greater than the parent run"}
+                  </div>
                 </div>
-                </div>
-            ) : (
-                "No lineage range available"
-            )}
+              ) : (
+                "No lineage pair available"
+              )}
             </div>
           </div>
         </section>
@@ -240,7 +249,9 @@ export default function LineageDashboard() {
             <h2 className="text-lg font-medium">Lineage table</h2>
 
             {edgesQuery.isLoading && (
-              <p className="mt-3 text-sm text-muted-foreground">Loading lineage edges...</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Loading lineage edges...
+              </p>
             )}
 
             {edgesQuery.error && (
@@ -275,15 +286,29 @@ export default function LineageDashboard() {
                       <td className="py-2 pr-4">
                         Run {edge.childRunId} / Cluster {edge.childClusterId}
                       </td>
-                      <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
+                      <td className="py-2 pr-4">
+                        {formatNumber(edge.score)}
+                      </td>
                       <td className="py-2 pr-4">
                         {formatNumber(edge.centroidSimilarity)}
                       </td>
                       <td className="py-2 pr-4">
-                        {edge.articleOverlapCount} ({formatNumber(edge.articleOverlapRatio)})
+                        {edge.articleOverlapCount} (
+                        {formatNumber(edge.articleOverlapRatio)})
                       </td>
                     </tr>
                   ))}
+                  {edges.length === 0 && !edgesQuery.isLoading && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-4 pr-4 text-sm text-muted-foreground"
+                      >
+                        No lineage edges found for this pair and score
+                        threshold.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -294,13 +319,15 @@ export default function LineageDashboard() {
 
             {!selectedEdgeId && (
               <p className="mt-3 text-sm text-muted-foreground">
-                Click a lineage edge to inspect overlap between the parent and child
-                clusters.
+                Click a lineage edge to inspect overlap between the parent and
+                child clusters.
               </p>
             )}
 
             {eulerQuery.isLoading && (
-              <p className="mt-3 text-sm text-muted-foreground">Loading Euler detail...</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Loading Euler detail...
+              </p>
             )}
 
             {eulerQuery.error && (
@@ -312,11 +339,15 @@ export default function LineageDashboard() {
             {eulerQuery.data && (
               <div className="mt-4 grid gap-4">
                 <div>
-                  <h3 className="font-medium">{eulerQuery.data.labels.title}</h3>
+                  <h3 className="font-medium">
+                    {eulerQuery.data.labels.title}
+                  </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {eulerQuery.data.labels.subtitle}
                   </p>
-                  <p className="mt-3 text-sm">{eulerQuery.data.labels.explanation}</p>
+                  <p className="mt-3 text-sm">
+                    {eulerQuery.data.labels.explanation}
+                  </p>
                 </div>
 
                 <dl className="space-y-2 text-sm">
@@ -324,14 +355,22 @@ export default function LineageDashboard() {
                   <div>Child size: {eulerQuery.data.child.size}</div>
                   <div>Overlap: {eulerQuery.data.overlap.count}</div>
                   <div>
-                    Parent coverage: {formatNumber(eulerQuery.data.overlap.parentCoverage)}
+                    Parent coverage:{" "}
+                    {formatNumber(
+                      eulerQuery.data.overlap.parentCoverage,
+                    )}
                   </div>
                   <div>
-                    Child coverage: {formatNumber(eulerQuery.data.overlap.childCoverage)}
+                    Child coverage:{" "}
+                    {formatNumber(
+                      eulerQuery.data.overlap.childCoverage,
+                    )}
                   </div>
                   <div>Union size: {eulerQuery.data.overlap.unionSize}</div>
                   <div>Jaccard: {formatNumber(eulerQuery.data.overlap.jaccard)}</div>
-                  <div>Similarity: {formatNumber(eulerQuery.data.metrics.similarity)}</div>
+                  <div>
+                    Similarity: {formatNumber(eulerQuery.data.metrics.similarity)}
+                  </div>
                   <div>Score: {formatNumber(eulerQuery.data.metrics.score)}</div>
                 </dl>
               </div>
