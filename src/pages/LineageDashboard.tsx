@@ -30,8 +30,8 @@ export default function LineageDashboard() {
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
   const [pairIndex, setPairIndex] = useState<number>(0);
   const [minScore, setMinScore] = useState(0);
-  
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
+
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 12 }),
     queryFn: () => getClusteringRuns({ status: "success", limit: 12 }),
@@ -90,7 +90,7 @@ export default function LineageDashboard() {
   const parentRunId = manualParentRunId ?? activePair?.parentRunId ?? null;
 
   const childOptions = useMemo(() => {
-    if (!parentRunId) {
+    if (parentRunId === null) {
       return [];
     }
 
@@ -150,7 +150,8 @@ export default function LineageDashboard() {
 
     const nextIndex = availablePairs.findIndex(
       (pair) =>
-        pair.parentRunId === parentRunId && pair.childRunId === childRunId,
+        pair.parentRunId === parentRunId &&
+        pair.childRunId === childRunId,
     );
 
     if (nextIndex >= 0) {
@@ -194,6 +195,7 @@ export default function LineageDashboard() {
 
   const edges = edgesQuery.data?.items ?? [];
   const pairEdgeCount = edges.length;
+
   const canStepBackward = availablePairs.length > 0 && pairIndex > 0;
   const canStepForward =
     availablePairs.length > 0 && pairIndex < availablePairs.length - 1;
@@ -375,13 +377,16 @@ export default function LineageDashboard() {
             </div>
           </div>
 
+          <div className="mt-6">
             <LineageFlow
-                edges={edges}
-                parentRunId={parentRunId}
-                childRunId={childRunId}
-                selectedEdgeId={selectedEdgeId}
-                onSelectEdge={setSelectedEdgeId}
+              edges={edges}
+              parentRunId={parentRunId}
+              childRunId={childRunId}
+              selectedEdgeId={selectedEdgeId}
+              onSelectEdge={setSelectedEdgeId}
             />
+          </div>
+
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
@@ -414,7 +419,9 @@ export default function LineageDashboard() {
             <h2 className="text-lg font-medium">Lineage table</h2>
 
             {edgesQuery.isLoading && (
-              <p className="mt-3 text-sm text-muted-foreground">Loading lineage edges...</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Loading lineage edges...
+              </p>
             )}
 
             {edgesQuery.error && (
@@ -436,28 +443,37 @@ export default function LineageDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {edges.map((edge: LineageEdge) => (
-                    <tr
-                      key={edge.edgeId}
-                      className="cursor-pointer border-b hover:bg-muted/50"
-                      onClick={() => setSelectedEdgeId(edge.edgeId)}
-                    >
-                      <td className="py-2 pr-4">{edge.edgeId}</td>
-                      <td className="py-2 pr-4">
-                        Run {edge.parentRunId} / Cluster {edge.parentClusterId}
-                      </td>
-                      <td className="py-2 pr-4">
-                        Run {edge.childRunId} / Cluster {edge.childClusterId}
-                      </td>
-                      <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
-                      <td className="py-2 pr-4">
-                        {formatNumber(edge.centroidSimilarity)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {edge.articleOverlapCount} ({formatNumber(edge.articleOverlapRatio)})
-                      </td>
-                    </tr>
-                  ))}
+                  {edges.map((edge: LineageEdge) => {
+                    const isSelected = selectedEdgeId === edge.edgeId;
+
+                    return (
+                      <tr
+                        key={edge.edgeId}
+                        className={
+                          isSelected
+                            ? "cursor-pointer border-b bg-muted hover:bg-muted"
+                            : "cursor-pointer border-b hover:bg-muted/50"
+                        }
+                        onClick={() => setSelectedEdgeId(edge.edgeId)}
+                      >
+                        <td className="py-2 pr-4">{edge.edgeId}</td>
+                        <td className="py-2 pr-4">
+                          Run {edge.parentRunId} / Cluster {edge.parentClusterId}
+                        </td>
+                        <td className="py-2 pr-4">
+                          Run {edge.childRunId} / Cluster {edge.childClusterId}
+                        </td>
+                        <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
+                        <td className="py-2 pr-4">
+                          {formatNumber(edge.centroidSimilarity)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {edge.articleOverlapCount} (
+                          {formatNumber(edge.articleOverlapRatio)})
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {edges.length === 0 && !edgesQuery.isLoading && (
                     <tr>
@@ -477,9 +493,6 @@ export default function LineageDashboard() {
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-lg font-medium">Euler detail</h2>
 
-          <div className="rounded-lg border bg-card p-4 shadow-sm">
-            <h2 className="text-lg font-medium">Euler detail</h2>
-
             {!selectedEdgeId && (
               <p className="mt-3 text-sm text-muted-foreground">
                 Click a lineage edge to inspect overlap between the parent and child
@@ -488,7 +501,9 @@ export default function LineageDashboard() {
             )}
 
             {eulerQuery.isLoading && (
-              <p className="mt-3 text-sm text-muted-foreground">Loading Euler detail...</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Loading Euler detail...
+              </p>
             )}
 
             {eulerQuery.error && (
@@ -498,11 +513,10 @@ export default function LineageDashboard() {
             )}
 
             {eulerQuery.data && (
-              <div className="mt-4 grid gap-4">
-                ...
+              <div className="mt-4">
+                <EulerOverlapDiagram detail={eulerQuery.data} />
               </div>
             )}
-          </div>
           </div>
         </section>
       </main>
