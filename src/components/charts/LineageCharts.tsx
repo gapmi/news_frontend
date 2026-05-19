@@ -1,18 +1,5 @@
 import { useMemo } from "react";
 import type { LineageEdge } from "@/api/clustering";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from "recharts";
 
 type Props = {
   edges: LineageEdge[];
@@ -29,32 +16,10 @@ export default function LineageCharts({
   parentRunId,
   childRunId,
 }: Props) {
-  const topScoreData = useMemo(() => {
+  const topEdges = useMemo(() => {
     return [...edges]
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
-      .map((edge) => ({
-        id: `#${edge.edgeId}`,
-        pair: `P${edge.parentClusterId}→C${edge.childClusterId}`,
-        score: Number(edge.score.toFixed(4)),
-        similarity: Number(edge.centroidSimilarity.toFixed(4)),
-        overlapRatio: Number(edge.articleOverlapRatio.toFixed(4)),
-        overlapCount: edge.articleOverlapCount,
-        label: `${edge.parentClusterId} → ${edge.childClusterId}`,
-      }))
-      .reverse();
-  }, [edges]);
-
-  const scatterData = useMemo(() => {
-    return edges.map((edge) => ({
-      edgeId: edge.edgeId,
-      x: Number(edge.centroidSimilarity.toFixed(4)),
-      y: Number(edge.articleOverlapRatio.toFixed(4)),
-      z: Math.max(edge.articleOverlapCount, 1),
-      score: Number(edge.score.toFixed(4)),
-      overlapCount: edge.articleOverlapCount,
-      label: `${edge.parentClusterId} → ${edge.childClusterId}`,
-    }));
+      .slice(0, 12);
   }, [edges]);
 
   if (!parentRunId || !childRunId) {
@@ -62,101 +27,76 @@ export default function LineageCharts({
   }
 
   return (
-    <section className="mb-6 grid gap-6 xl:grid-cols-2">
+    <section className="mb-6">
       <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <h2 className="text-lg font-medium">Top edges by score</h2>
+        <h2 className="text-lg font-medium">Top lineage matches</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pair {parentRunId} → {childRunId}, top 10 lineage matches by score.
+          Pair {parentRunId} → {childRunId}, ranked by lineage score.
         </p>
 
-        <div className="mt-4 h-[320px]">
-          {topScoreData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topScoreData} layout="vertical" margin={{ left: 8, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 1]} />
-                <YAxis
-                  type="category"
-                  dataKey="pair"
-                  width={90}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  formatter={(value: number, name: string) => [
-                    formatNumber(value, 4),
-                    name,
-                  ]}
-                  labelFormatter={(_, payload) => {
-                    const row = payload?.[0]?.payload;
-                    return row ? `Edge ${row.id} · ${row.label}` : "";
-                  }}
-                />
-                <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                  {topScoreData.map((entry) => (
-                    <Cell
-                      key={entry.id}
-                      fill={entry.score >= 0.75 ? "#2563eb" : "#60a5fa"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              No chart data for this pair.
-            </div>
-          )}
-        </div>
-      </div>
+        {topEdges.length === 0 ? (
+          <div className="mt-4 rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+            No chart data for this pair.
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {topEdges.map((edge) => {
+              const scorePercent = Math.max(0, Math.min(edge.score * 100, 100));
 
-      <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <h2 className="text-lg font-medium">Similarity vs overlap</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Each dot is one lineage edge; larger dots mean more overlapping articles.
-        </p>
+              return (
+                <button
+                  key={edge.edgeId}
+                  type="button"
+                  className="w-full rounded-md border bg-background p-3 text-left transition-colors hover:bg-muted/40"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 lg:w-[260px]">
+                      <div className="text-sm font-medium">
+                        {`P${edge.parentClusterId} → C${edge.childClusterId}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {`Edge #${edge.edgeId} · parent ${edge.parentSize} · child ${edge.childSize}`}
+                      </div>
+                    </div>
 
-        <div className="mt-4 h-[320px]">
-          {scatterData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  type="number"
-                  dataKey="x"
-                  name="Similarity"
-                  domain={[0, 1]}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis
-                  type="number"
-                  dataKey="y"
-                  name="Overlap ratio"
-                  domain={[0, 1]}
-                  tick={{ fontSize: 12 }}
-                />
-                <ZAxis type="number" dataKey="z" range={[60, 320]} />
-                <Tooltip
-                  cursor={{ strokeDasharray: "3 3" }}
-                  formatter={(value: number, name: string) => [
-                    formatNumber(value, 4),
-                    name,
-                  ]}
-                  labelFormatter={(_, payload) => {
-                    const row = payload?.[0]?.payload;
-                    return row
-                      ? `Edge #${row.edgeId} · ${row.label} · overlap ${row.overlapCount}`
-                      : "";
-                  }}
-                />
-                <Scatter data={scatterData} fill="#7c3aed" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              No chart data for this pair.
-            </div>
-          )}
-        </div>
+                    <div className="flex-1">
+                      <div className="h-3 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${scorePercent}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Score {formatNumber(edge.score, 4)}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground lg:w-[260px]">
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {formatNumber(edge.centroidSimilarity, 3)}
+                        </div>
+                        <div>Similarity</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {edge.articleOverlapCount}
+                        </div>
+                        <div>Overlap</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {formatNumber(edge.articleOverlapRatio, 3)}
+                        </div>
+                        <div>Ratio</div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
