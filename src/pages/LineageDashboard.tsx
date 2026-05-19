@@ -8,7 +8,7 @@ import {
   getPipelineRuns,
   type LineageEdge,
 } from "@/api/clustering";
-import LineageCharts from "@/components/charts/LineageCharts";
+import LineageFlow from "@/components/charts/LineageFlow";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -373,10 +373,12 @@ export default function LineageDashboard() {
               )}
             </div>
 
-            <LineageCharts
+            <LineageFlow
                 edges={edges}
                 parentRunId={parentRunId}
                 childRunId={childRunId}
+                selectedEdgeId={selectedEdgeId}
+                onSelectEdge={setSelectedEdgeId}
             />
 
           </div>
