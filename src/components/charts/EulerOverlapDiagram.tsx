@@ -50,7 +50,7 @@ function solveCircleDistance(r1: number, r2: number, targetOverlap: number) {
   const maxOverlap = Math.PI * Math.min(r1, r2) ** 2;
 
   if (targetOverlap <= 0) {
-    return r1 + r2 + 4;
+    return r1 + r2 + 8;
   }
 
   if (targetOverlap >= maxOverlap) {
@@ -60,7 +60,7 @@ function solveCircleDistance(r1: number, r2: number, targetOverlap: number) {
   let low = Math.abs(r1 - r2);
   let high = r1 + r2;
 
-  for (let i = 0; i < 48; i += 1) {
+  for (let i = 0; i < 56; i += 1) {
     const mid = (low + high) / 2;
     const overlap = circleOverlapArea(r1, r2, mid);
 
@@ -84,50 +84,56 @@ export default function EulerOverlapDiagram({ detail }: Props) {
       Math.min(parentArea, childArea),
     );
 
-    const baseScale = 7;
-    const r1 = Math.sqrt(parentArea / Math.PI) * baseScale;
-    const r2 = Math.sqrt(childArea / Math.PI) * baseScale;
-    const d = solveCircleDistance(r1, r2, intersectionArea);
+    const baseScale = 10;
+    const rawParentRadius = Math.sqrt(parentArea / Math.PI) * baseScale;
+    const rawChildRadius = Math.sqrt(childArea / Math.PI) * baseScale;
+    const rawDistance = solveCircleDistance(
+      rawParentRadius,
+      rawChildRadius,
+      intersectionArea,
+    );
 
-    const width = 520;
-    const height = 320;
-    const leftCx = 180;
-    const rightCx = leftCx + d;
-    const cy = 150;
+    const width = 720;
+    const height = 420;
 
-    const minX = Math.min(leftCx - r1, rightCx - r2);
-    const maxX = Math.max(leftCx + r1, rightCx + r2);
-    const diagramWidth = maxX - minX;
+    const horizontalPadding = 70;
+    const topPadding = 110;
+    const bottomPadding = 60;
 
-    let scale = 1;
-    const maxAllowedWidth = 360;
-    const maxAllowedHeight = 180;
+    const rawLeft = 220 - rawParentRadius;
+    const rawRight = 220 + rawDistance + rawChildRadius;
+    const rawDiagramWidth = rawRight - rawLeft;
+    const rawDiagramHeight = Math.max(rawParentRadius, rawChildRadius) * 2;
 
-    if (diagramWidth > maxAllowedWidth) {
-      scale = Math.min(scale, maxAllowedWidth / diagramWidth);
-    }
-    if (Math.max(r1, r2) * 2 > maxAllowedHeight) {
-      scale = Math.min(scale, maxAllowedHeight / (Math.max(r1, r2) * 2));
-    }
+    const usableWidth = width - horizontalPadding * 2;
+    const usableHeight = height - topPadding - bottomPadding;
 
-    const pr = r1 * scale;
-    const cr = r2 * scale;
-    const pd = d * scale;
+    const scale = Math.min(
+      usableWidth / Math.max(rawDiagramWidth, 1),
+      usableHeight / Math.max(rawDiagramHeight, 1),
+      1.35,
+    );
 
-    const parentCx = 180;
-    const childCx = parentCx + pd;
-    const centerY = cy;
+    const parentRadius = rawParentRadius * scale;
+    const childRadius = rawChildRadius * scale;
+    const distance = rawDistance * scale;
+
+    const centerY = topPadding + usableHeight / 2;
+    const parentCx = width / 2 - distance / 2;
+    const childCx = width / 2 + distance / 2;
 
     return {
       width,
       height,
+      centerY,
       parentCx,
       childCx,
-      centerY,
-      pr,
-      cr,
+      parentRadius,
+      childRadius,
     };
   }, [detail]);
+
+  const overlapCenterX = (diagram.parentCx + diagram.childCx) / 2;
 
   return (
     <div className="rounded-lg border bg-background p-4">
@@ -141,7 +147,7 @@ export default function EulerOverlapDiagram({ detail }: Props) {
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${diagram.width} ${diagram.height}`}
-          className="h-auto w-full min-w-[420px]"
+          className="h-auto w-full min-w-[520px]"
           role="img"
           aria-label={`Euler overlap for parent cluster ${detail.parent.clusterId} and child cluster ${detail.child.clusterId}`}
         >
@@ -150,15 +156,7 @@ export default function EulerOverlapDiagram({ detail }: Props) {
               <circle
                 cx={diagram.parentCx}
                 cy={diagram.centerY}
-                r={diagram.pr}
-              />
-            </clipPath>
-
-            <clipPath id={`child-clip-${detail.edgeId}`}>
-              <circle
-                cx={diagram.childCx}
-                cy={diagram.centerY}
-                r={diagram.cr}
+                r={diagram.parentRadius}
               />
             </clipPath>
           </defs>
@@ -166,47 +164,48 @@ export default function EulerOverlapDiagram({ detail }: Props) {
           <circle
             cx={diagram.parentCx}
             cy={diagram.centerY}
-            r={diagram.pr}
+            r={diagram.parentRadius}
             fill="#93c5fd"
             fillOpacity="0.45"
             stroke="#2563eb"
-            strokeWidth="2"
+            strokeWidth="3"
           />
+
           <circle
             cx={diagram.childCx}
             cy={diagram.centerY}
-            r={diagram.cr}
+            r={diagram.childRadius}
             fill="#c4b5fd"
             fillOpacity="0.45"
             stroke="#7c3aed"
-            strokeWidth="2"
+            strokeWidth="3"
           />
 
           <g clipPath={`url(#parent-clip-${detail.edgeId})`}>
             <circle
               cx={diagram.childCx}
               cy={diagram.centerY}
-              r={diagram.cr}
+              r={diagram.childRadius}
               fill="#60a5fa"
-              fillOpacity="0.5"
+              fillOpacity="0.55"
             />
           </g>
 
           <text
             x={diagram.parentCx}
-            y={40}
+            y={38}
             textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
+            fontSize="18"
+            fontWeight="700"
             fill="#1d4ed8"
           >
             {`Parent C${detail.parent.clusterId}`}
           </text>
           <text
             x={diagram.parentCx}
-            y={58}
+            y={62}
             textAnchor="middle"
-            fontSize="11"
+            fontSize="14"
             fill="#1e40af"
           >
             {`size ${detail.parent.size}`}
@@ -214,47 +213,47 @@ export default function EulerOverlapDiagram({ detail }: Props) {
 
           <text
             x={diagram.childCx}
-            y={40}
+            y={38}
             textAnchor="middle"
-            fontSize="13"
-            fontWeight="600"
+            fontSize="18"
+            fontWeight="700"
             fill="#6d28d9"
           >
             {`Child C${detail.child.clusterId}`}
           </text>
           <text
             x={diagram.childCx}
-            y={58}
+            y={62}
             textAnchor="middle"
-            fontSize="11"
+            fontSize="14"
             fill="#6d28d9"
           >
             {`size ${detail.child.size}`}
           </text>
 
           <text
-            x={(diagram.parentCx + diagram.childCx) / 2}
-            y={diagram.centerY + 8}
+            x={overlapCenterX}
+            y={diagram.centerY - 4}
             textAnchor="middle"
-            fontSize="14"
-            fontWeight="700"
+            fontSize="26"
+            fontWeight="800"
             fill="#111827"
           >
             {detail.overlap.count}
           </text>
           <text
-            x={(diagram.parentCx + diagram.childCx) / 2}
-            y={diagram.centerY + 26}
+            x={overlapCenterX}
+            y={diagram.centerY + 20}
             textAnchor="middle"
-            fontSize="11"
-            fill="#6b7280"
+            fontSize="13"
+            fill="#4b5563"
           >
             overlap
           </text>
         </svg>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-md border bg-card px-3 py-2">
           <div className="text-xs text-muted-foreground">Parent coverage</div>
           <div className="text-sm font-medium">
