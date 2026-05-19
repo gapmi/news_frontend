@@ -218,10 +218,19 @@ export default function LineageDashboard() {
               />
             </label>
 
-            <div className="flex items-end rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              {startRunId && endRunId
-                ? `Range: ${startRunId} → ${endRunId}`
-                : "No lineage range available"}
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            {startRunId && endRunId ? (
+                <div className="space-y-1">
+                <div>{`Selected range: ${startRunId} → ${endRunId}`}</div>
+                <div className="text-xs text-muted-foreground">
+                    {startRunId < endRunId
+                    ? `Current table pair: ${startRunId} → ${startRunId + 1}`
+                    : "Choose an end run greater than the start run"}
+                </div>
+                </div>
+            ) : (
+                "No lineage range available"
+            )}
             </div>
           </div>
         </section>
