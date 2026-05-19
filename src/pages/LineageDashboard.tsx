@@ -8,6 +8,7 @@ import {
   getPipelineRuns,
   type LineageEdge,
 } from "@/api/clustering";
+import LineageCharts from "@/components/charts/LineageCharts";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -371,6 +372,13 @@ export default function LineageDashboard() {
                 "No valid lineage pair available"
               )}
             </div>
+
+            <LineageCharts
+                edges={edges}
+                parentRunId={parentRunId}
+                childRunId={childRunId}
+            />
+
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
