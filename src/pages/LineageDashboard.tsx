@@ -28,8 +28,8 @@ export default function LineageDashboard() {
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
   const [pairIndex, setPairIndex] = useState<number>(0);
   const [minScore, setMinScore] = useState(0);
+  
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
-
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 12 }),
     queryFn: () => getClusteringRuns({ status: "success", limit: 12 }),
@@ -191,7 +191,7 @@ export default function LineageDashboard() {
   }, [runs]);
 
   const edges = edgesQuery.data?.items ?? [];
-
+  const pairEdgeCount = edges.length;
   const canStepBackward = availablePairs.length > 0 && pairIndex > 0;
   const canStepForward =
     availablePairs.length > 0 && pairIndex < availablePairs.length - 1;
@@ -352,9 +352,20 @@ export default function LineageDashboard() {
               {parentRunId !== null && childRunId !== null ? (
                 <div className="space-y-1">
                   <div>{`Selected pair: ${parentRunId} → ${childRunId}`}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Lineage table shows edges between these runs
-                  </div>
+
+                  {edgesQuery.isLoading ? (
+                    <div className="text-xs text-muted-foreground">
+                      Loading edges for selected pair...
+                    </div>
+                  ) : edgesQuery.error ? (
+                    <div className="text-xs text-red-600">
+                      Failed to load edges for selected pair
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      {`Edges for pair: ${pairEdgeCount}`}
+                    </div>
+                  )}
                 </div>
               ) : (
                 "No valid lineage pair available"
