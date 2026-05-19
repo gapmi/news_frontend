@@ -97,6 +97,18 @@ export default function LineageDashboard() {
       .map((pair) => pair.childRunId);
   }, [availablePairs, parentRunId]);
 
+  const childRunHelperText = useMemo(() => {
+    if (parentRunId === null) {
+      return "Choose a parent run to see valid child runs";
+    }
+
+    if (childOptions.length === 0) {
+      return `No valid child runs for parent ${parentRunId}`;
+    }
+
+    return `Available for parent ${parentRunId}: ${childOptions.join(", ")}`;
+  }, [parentRunId, childOptions]);
+
   const childRunId = useMemo(() => {
     if (manualChildRunId !== null && childOptions.includes(manualChildRunId)) {
       return manualChildRunId;
@@ -303,6 +315,7 @@ export default function LineageDashboard() {
                   setSelectedEdgeId(null);
                 }}
                 disabled={childOptions.length === 0}
+                aria-describedby="child-run-helper"
               >
                 {childOptions.map((runId) => (
                   <option key={runId} value={runId}>
@@ -310,6 +323,13 @@ export default function LineageDashboard() {
                   </option>
                 ))}
               </select>
+
+              <span
+                id="child-run-helper"
+                className="text-xs text-muted-foreground"
+              >
+                {childRunHelperText}
+              </span>
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
