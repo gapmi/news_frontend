@@ -98,12 +98,18 @@ export interface ClusterDetail {
   clusterId: number;
   runId: number;
   clusterLabel: number;
+  displayName?: string | null;
   size: number;
   representativeArticleId: number | null;
   representativeTitle: string | null;
   createdAt: string;
   incomingEdgeCount: number;
   outgoingEdgeCount: number;
+  nameShort?: string | null;
+  nameTitle?: string | null;
+  languageCode?: string | null;
+  tags?: string[] | null;
+  concepts?: string[] | null;
   articles: ArticlePreview[];
 }
 
@@ -124,6 +130,18 @@ export interface LineageEdge {
   matchedAt: string;
 }
 
+export interface ClusterMeta {
+  representativeArticleId?: number | null;
+  representativeTitle?: string | null;
+  displayName?: string | null;
+  nameShort?: string | null;
+  nameTitle?: string | null;
+  languageCode?: string | null;
+  tags?: string[] | null;
+  concepts?: string[] | null;
+  [key: string]: unknown;
+}
+
 export interface SankeyNode {
   id: string;
   label: string | null;
@@ -132,10 +150,7 @@ export interface SankeyNode {
   clusterLabel: number;
   size: number;
   depth: number;
-  meta: {
-    representativeArticleId?: number | null;
-    [key: string]: unknown;
-  };
+  meta: ClusterMeta;
 }
 
 export interface SankeyLink {
@@ -184,10 +199,7 @@ export interface GraphNode {
     colorKey?: string;
     [key: string]: unknown;
   };
-  meta: {
-    representativeArticleId?: number | null;
-    [key: string]: unknown;
-  };
+  meta: ClusterMeta;
 }
 
 export interface GraphEdge {
@@ -299,7 +311,12 @@ export interface LineageEdgesParams {
   min_overlap_count?: number;
   limit?: number;
   offset?: number;
-  sort?: "score_desc" | "score_asc" | "similarity_desc" | "overlap_desc" | "matched_at_desc";
+  sort?:
+    | "score_desc"
+    | "score_asc"
+    | "similarity_desc"
+    | "overlap_desc"
+    | "matched_at_desc";
 }
 
 export interface SankeyParams {
@@ -326,7 +343,8 @@ export interface GraphParams {
 export const clusteringKeys = {
   all: ["clustering"] as const,
   runs: (params: RunsParams = {}) => [...clusteringKeys.all, "runs", params] as const,
-  clusters: (params: ClustersParams = {}) => [...clusteringKeys.all, "clusters", params] as const,
+  clusters: (params: ClustersParams = {}) =>
+    [...clusteringKeys.all, "clusters", params] as const,
   cluster: (clusterId: number, params: ClusterDetailParams = {}) =>
     [...clusteringKeys.all, "clusters", clusterId, params] as const,
   lineageEdges: (params: LineageEdgesParams = {}) =>
@@ -343,48 +361,48 @@ export const clusteringKeys = {
 
 export function getClusteringRuns(params: RunsParams = {}) {
   return fetchJson<PaginatedResponse<RunSummary>>(
-    `/v1/clustering/runs${buildQuery(params)}`,
+    `/v1/clustering/runs${buildQuery(params)}`
   );
 }
 
 export function getClusters(params: ClustersParams = {}) {
   return fetchJson<PaginatedResponse<ClusterDetail>>(
-    `/v1/clustering/clusters${buildQuery(params)}`,
+    `/v1/clustering/clusters${buildQuery(params)}`
   );
 }
 
 export function getClusterDetail(clusterId: number, params: ClusterDetailParams = {}) {
   return fetchJson<ClusterDetail>(
-    `/v1/clustering/clusters/${clusterId}${buildQuery(params)}`,
+    `/v1/clustering/clusters/${clusterId}${buildQuery(params)}`
   );
 }
 
 export function getLineageEdges(params: LineageEdgesParams = {}) {
   return fetchJson<PaginatedResponse<LineageEdge>>(
-    `/v1/clustering/lineage/edges${buildQuery(params)}`,
+    `/v1/clustering/lineage/edges${buildQuery(params)}`
   );
 }
 
 export function getSankeyView(params: SankeyParams) {
   return fetchJson<SankeyResponse>(
-    `/v1/clustering/views/sankey${buildQuery(params)}`,
+    `/v1/clustering/views/sankey${buildQuery(params)}`
   );
 }
 
 export function getGraphView(params: GraphParams) {
   return fetchJson<GraphResponse>(
-    `/v1/clustering/views/graph${buildQuery(params)}`,
+    `/v1/clustering/views/graph${buildQuery(params)}`
   );
 }
 
 export function getEulerPairDetail(edgeId: number) {
   return fetchJson<EulerPairDetail>(
-    `/v1/clustering/views/euler/${edgeId}`,
+    `/v1/clustering/views/euler/${edgeId}`
   );
 }
 
 export function getPipelineRuns(params: PipelineRunsParams = {}) {
   return fetchJson<PaginatedResponse<PipelineRun>>(
-    `/v1/clustering/pipeline/runs${buildQuery(params)}`,
+    `/v1/clustering/pipeline/runs${buildQuery(params)}`
   );
 }
