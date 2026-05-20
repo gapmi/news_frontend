@@ -20,6 +20,10 @@ function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
+function formatClusterRef(clusterId: number, label?: string | null) {
+  return label ? `${label} · C${clusterId}` : `Cluster ${clusterId}`;
+}
+
 type RunPair = {
   parentRunId: number;
   childRunId: number;
@@ -195,6 +199,14 @@ export default function LineageDashboard() {
 
   const edges = edgesQuery.data?.items ?? [];
   const pairEdgeCount = edges.length;
+
+  const selectedEdge = useMemo(
+    () => edges.find((edge) => edge.edgeId === selectedEdgeId) ?? null,
+    [edges, selectedEdgeId],
+  );
+
+  const selectedParentLabel = eulerQuery.data?.parent.label ?? null;
+  const selectedChildLabel = eulerQuery.data?.child.label ?? null;
 
   const canStepBackward = availablePairs.length > 0 && pairIndex > 0;
   const canStepForward =
@@ -377,6 +389,35 @@ export default function LineageDashboard() {
             </div>
           </div>
 
+          {selectedEdge && (
+            <div className="mt-4 rounded-lg border bg-background px-4 py-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Selected lineage edge
+              </div>
+              <div className="mt-2 grid gap-3 md:grid-cols-2">
+                <div>
+                  <div className="text-sm font-medium">Parent cluster</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatClusterRef(selectedEdge.parentClusterId, selectedParentLabel)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Run {selectedEdge.parentRunId} · size {selectedEdge.parentSize}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium">Child cluster</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatClusterRef(selectedEdge.childClusterId, selectedChildLabel)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Run {selectedEdge.childRunId} · size {selectedEdge.childSize}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mt-6">
             <LineageFlow
               edges={edges}
@@ -445,6 +486,10 @@ export default function LineageDashboard() {
                 <tbody>
                   {edges.map((edge: LineageEdge) => {
                     const isSelected = selectedEdgeId === edge.edgeId;
+                    const parentLabel =
+                      isSelected ? (eulerQuery.data?.parent.label ?? null) : null;
+                    const childLabel =
+                      isSelected ? (eulerQuery.data?.child.label ?? null) : null;
 
                     return (
                       <tr
@@ -456,20 +501,29 @@ export default function LineageDashboard() {
                         }
                         onClick={() => setSelectedEdgeId(edge.edgeId)}
                       >
-                        <td className="py-2 pr-4">{edge.edgeId}</td>
+                        <td className="py-2 pr-4 align-top">{edge.edgeId}</td>
                         <td className="py-2 pr-4">
-                          Run {edge.parentRunId} / Cluster {edge.parentClusterId}
+                          <div className="font-medium">
+                            {formatClusterRef(edge.parentClusterId, parentLabel)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Run {edge.parentRunId} · size {edge.parentSize}
+                          </div>
                         </td>
                         <td className="py-2 pr-4">
-                          Run {edge.childRunId} / Cluster {edge.childClusterId}
+                          <div className="font-medium">
+                            {formatClusterRef(edge.childClusterId, childLabel)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Run {edge.childRunId} · size {edge.childSize}
+                          </div>
                         </td>
                         <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
                         <td className="py-2 pr-4">
                           {formatNumber(edge.centroidSimilarity)}
                         </td>
                         <td className="py-2 pr-4">
-                          {edge.articleOverlapCount} (
-                          {formatNumber(edge.articleOverlapRatio)})
+                          {edge.articleOverlapCount} ({formatNumber(edge.articleOverlapRatio)})
                         </td>
                       </tr>
                     );

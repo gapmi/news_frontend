@@ -111,6 +111,9 @@ export default function EulerOverlapDiagram({ detail }: Props) {
 
   const overlapCenterX = (diagram.parentCx + diagram.childCx) / 2;
 
+  const parentTitle = detail.parent.label ?? `Parent C${detail.parent.clusterId}`;
+  const childTitle = detail.child.label ?? `Child C${detail.child.clusterId}`;
+
   return (
     <div className="rounded-lg border bg-background p-4">
       <div className="mb-4">
@@ -123,19 +126,19 @@ export default function EulerOverlapDiagram({ detail }: Props) {
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border bg-blue-50 px-3 py-2">
           <div className="text-sm font-semibold text-blue-700">
-            Parent C{detail.parent.clusterId}
+            {parentTitle}
           </div>
           <div className="text-xs text-blue-700/80">
-            size {detail.parent.size}
+            run {detail.parent.runId} · size {detail.parent.size} · cluster {detail.parent.clusterId}
           </div>
         </div>
 
         <div className="rounded-md border bg-violet-50 px-3 py-2">
           <div className="text-sm font-semibold text-violet-700">
-            Child C{detail.child.clusterId}
+            {childTitle}
           </div>
           <div className="text-xs text-violet-700/80">
-            size {detail.child.size}
+            run {detail.child.runId} · size {detail.child.size} · cluster {detail.child.clusterId}
           </div>
         </div>
       </div>
@@ -145,7 +148,7 @@ export default function EulerOverlapDiagram({ detail }: Props) {
           viewBox={`0 0 ${diagram.width} ${diagram.height}`}
           className="h-auto w-full min-w-[420px]"
           role="img"
-          aria-label={`Euler overlap for parent cluster ${detail.parent.clusterId} and child cluster ${detail.child.clusterId}`}
+          aria-label={`Euler overlap for ${parentTitle} and ${childTitle}`}
         >
           <defs>
             <clipPath id={`parent-clip-${detail.edgeId}`}>
