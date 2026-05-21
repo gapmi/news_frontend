@@ -12,6 +12,7 @@ import {
 import LineageFlow from "@/components/charts/LineageFlow";
 import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
 import LineageSankey from "@/components/charts/LineageSankey";
+import MultiRunSankey from "@/components/charts/MultiRunSankey";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -467,43 +468,43 @@ export default function LineageDashboard() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
-        <h2 className="text-lg font-medium">Sankey</h2>
+<section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+  <h2 className="text-lg font-medium">Multi-run lineage</h2>
 
-        {sankeyQuery.isLoading && (
-            <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
-        )}
+  {sankeyQuery.isLoading && (
+    <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
+  )}
 
-        {sankeyQuery.error && (
-            <p className="mt-3 text-sm text-red-600">
-            {(sankeyQuery.error as Error).message}
-            </p>
-        )}
+  {sankeyQuery.error && (
+    <p className="mt-3 text-sm text-red-600">
+      {(sankeyQuery.error as Error).message}
+    </p>
+  )}
 
-        {sankeyQuery.data && (
-            <>
-            <div className="mt-3 text-sm text-muted-foreground">
-                Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
-                {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
-                {sankeyQuery.data.stats?.runCount ?? "—"}
-            </div>
+  {sankeyQuery.data && (
+    <>
+      <div className="mt-3 text-sm text-muted-foreground">
+        Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
+        {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
+        {sankeyQuery.data.stats?.runCount ?? "—"}
+      </div>
 
-            <div className="mt-4">
-               <LineageSankey
-                data={sankeyQuery.data}
-                selectedEdgeId={selectedEdgeId}
-                onSelectEdge={setSelectedEdgeId}
-                />
-            </div>
-            </>
-        )}
+      <div className="mt-4">
+        <MultiRunSankey
+          data={sankeyQuery.data}
+          selectedEdgeId={selectedEdgeId}
+          onSelectEdge={setSelectedEdgeId}
+        />
+      </div>
+    </>
+  )}
 
-        {!sankeyQuery.isLoading && !sankeyQuery.error && !sankeyQuery.data && (
-            <p className="mt-3 text-sm text-muted-foreground">
-            No Sankey data for this pair and score threshold.
-            </p>
-        )}
-        </section>
+  {!sankeyQuery.isLoading && !sankeyQuery.error && !sankeyQuery.data && (
+    <p className="mt-3 text-sm text-muted-foreground">
+      No Sankey data for this range.
+    </p>
+  )}
+</section>
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-lg border bg-card p-4 shadow-sm">
