@@ -489,7 +489,11 @@ export default function LineageDashboard() {
             </div>
 
             <div className="mt-4">
-                <LineageSankey data={sankeyQuery.data} />
+               <LineageSankey
+                data={sankeyQuery.data}
+                selectedEdgeId={selectedEdgeId}
+                onSelectEdge={setSelectedEdgeId}
+                />
             </div>
             </>
         )}
