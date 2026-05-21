@@ -6,6 +6,7 @@ import {
   getEulerPairDetail,
   getLineageEdges,
   getPipelineRuns,
+  getSankeyView,
   type LineageEdge,
 } from "@/api/clustering";
 import LineageFlow from "@/components/charts/LineageFlow";
@@ -192,6 +193,26 @@ export default function LineageDashboard() {
     queryFn: () => getEulerPairDetail(selectedEdgeId!),
     enabled: selectedEdgeId !== null,
   });
+
+  const sankeyParams =
+  parentRunId !== null &&
+  childRunId !== null &&
+  parentRunId < childRunId
+    ? {
+        start_run_id: parentRunId,
+        end_run_id: childRunId,
+        min_score: minScore,
+      }
+    : null;
+
+const sankeyQuery = useQuery({
+  queryKey: sankeyParams
+    ? clusteringKeys.sankey(sankeyParams)
+    : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
+  queryFn: () => getSankeyView(sankeyParams!),
+  enabled: Boolean(sankeyParams),
+  placeholderData: keepPreviousData,
+});
 
   const totalVisibleLineageEdges = useMemo(() => {
     return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
@@ -445,6 +466,30 @@ export default function LineageDashboard() {
           </div>
         </section>
 
+        <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-lg font-medium">Sankey</h2>
+
+            {sankeyQuery.isLoading && (
+                <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
+            )}
+
+            {sankeyQuery.error && (
+                <p className="mt-3 text-sm text-red-600">
+                {(sankeyQuery.error as Error).message}
+                </p>
+            )}
+
+            {sankeyQuery.data && (
+                <div className="mt-3 text-sm text-muted-foreground">
+                Nodes: {sankeyQuery.data.stats.nodeCount} · Links: {sankeyQuery.data.stats.linkCount} · Runs: {sankeyQuery.data.stats.runCount}
+                </div>
+            )}
+
+            <div className="mt-4">
+                {/* сюда пойдёт сам Sankey component */}
+            </div>
+        </section>
+
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-lg font-medium">Lineage table</h2>
@@ -555,6 +600,12 @@ export default function LineageDashboard() {
                 {(eulerQuery.error as Error).message}
               </p>
             )}
+            
+            {sankeyQuery.data && (
+                <pre className="mt-4 overflow-x-auto rounded-md bg-muted p-3 text-xs">
+                    {JSON.stringify(sankeyQuery.data, null, 2)}
+                </pre>
+                )}
 
             {eulerQuery.data && (
               <div className="mt-4">
