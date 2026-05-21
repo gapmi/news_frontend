@@ -418,16 +418,6 @@ export default function LineageDashboard() {
             </div>
           )}
 
-          <div className="mt-6">
-            <LineageFlow
-              edges={edges}
-              parentRunId={parentRunId}
-              childRunId={childRunId}
-              selectedEdgeId={selectedEdgeId}
-              onSelectEdge={setSelectedEdgeId}
-            />
-          </div>
-
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
@@ -571,6 +561,15 @@ export default function LineageDashboard() {
                 <EulerOverlapDiagram detail={eulerQuery.data} />
               </div>
             )}
+          </div>
+        <div className="mt-6">
+            <LineageFlow
+              edges={edges}
+              parentRunId={parentRunId}
+              childRunId={childRunId}
+              selectedEdgeId={selectedEdgeId}
+              onSelectEdge={setSelectedEdgeId}
+            />
           </div>
         </section>
       </main>
