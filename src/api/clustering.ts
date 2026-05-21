@@ -397,7 +397,7 @@ export function getGraphView(params: GraphParams) {
 
 export function getEulerPairDetail(edgeId: number) {
   return fetchJson<EulerPairDetail>(
-    `/v1/clustering/views/euler/${edgeId}`
+    `/v1/clustering/views/euler/pair/${edgeId}`
   );
 }
 
