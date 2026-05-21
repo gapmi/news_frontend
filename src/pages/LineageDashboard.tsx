@@ -177,12 +177,32 @@ export default function LineageDashboard() {
         }
       : null;
 
+  const sankeyParams =
+    parentRunId !== null &&
+    childRunId !== null &&
+    parentRunId < childRunId
+      ? {
+          start_run_id: parentRunId,
+          end_run_id: childRunId,
+          min_score: minScore,
+        }
+      : null;
+
   const edgesQuery = useQuery({
     queryKey: edgeParams
       ? clusteringKeys.lineageEdges(edgeParams)
       : clusteringKeys.lineageEdges({ limit: 50 }),
     queryFn: () => getLineageEdges(edgeParams!),
     enabled: Boolean(edgeParams),
+    placeholderData: keepPreviousData,
+  });
+
+  const sankeyQuery = useQuery({
+    queryKey: sankeyParams
+      ? clusteringKeys.sankey(sankeyParams)
+      : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
+    queryFn: () => getSankeyView(sankeyParams!),
+    enabled: Boolean(sankeyParams),
     placeholderData: keepPreviousData,
   });
 
@@ -193,26 +213,6 @@ export default function LineageDashboard() {
     queryFn: () => getEulerPairDetail(selectedEdgeId!),
     enabled: selectedEdgeId !== null,
   });
-
-  const sankeyParams =
-  parentRunId !== null &&
-  childRunId !== null &&
-  parentRunId < childRunId
-    ? {
-        start_run_id: parentRunId,
-        end_run_id: childRunId,
-        min_score: minScore,
-      }
-    : null;
-
-const sankeyQuery = useQuery({
-  queryKey: sankeyParams
-    ? clusteringKeys.sankey(sankeyParams)
-    : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
-  queryFn: () => getSankeyView(sankeyParams!),
-  enabled: Boolean(sankeyParams),
-  placeholderData: keepPreviousData,
-});
 
   const totalVisibleLineageEdges = useMemo(() => {
     return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
@@ -467,27 +467,31 @@ const sankeyQuery = useQuery({
         </section>
 
         <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
-            <h2 className="text-lg font-medium">Sankey</h2>
+          <h2 className="text-lg font-medium">Sankey</h2>
 
-            {sankeyQuery.isLoading && (
-                <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
-            )}
+          {sankeyQuery.isLoading && (
+            <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
+          )}
 
-            {sankeyQuery.error && (
-                <p className="mt-3 text-sm text-red-600">
-                {(sankeyQuery.error as Error).message}
-                </p>
-            )}
+          {sankeyQuery.error && (
+            <p className="mt-3 text-sm text-red-600">
+              {(sankeyQuery.error as Error).message}
+            </p>
+          )}
 
-            {sankeyQuery.data && (
-                <div className="mt-3 text-sm text-muted-foreground">
-                Nodes: {sankeyQuery.data.stats.nodeCount} · Links: {sankeyQuery.data.stats.linkCount} · Runs: {sankeyQuery.data.stats.runCount}
-                </div>
-            )}
+          {sankeyQuery.data && (
+            <>
+              <div className="mt-3 text-sm text-muted-foreground">
+                Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
+                {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
+                {sankeyQuery.data.stats?.runCount ?? "—"}
+              </div>
 
-            <div className="mt-4">
-                {/* сюда пойдёт сам Sankey component */}
-            </div>
+              <pre className="mt-4 max-h-[420px] overflow-auto rounded-md bg-muted p-3 text-xs">
+                {JSON.stringify(sankeyQuery.data, null, 2)}
+              </pre>
+            </>
+          )}
         </section>
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -600,12 +604,6 @@ const sankeyQuery = useQuery({
                 {(eulerQuery.error as Error).message}
               </p>
             )}
-            
-            {sankeyQuery.data && (
-                <pre className="mt-4 overflow-x-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(sankeyQuery.data, null, 2)}
-                </pre>
-                )}
 
             {eulerQuery.data && (
               <div className="mt-4">
@@ -613,7 +611,8 @@ const sankeyQuery = useQuery({
               </div>
             )}
           </div>
-        <div className="mt-6">
+
+          <div className="mt-6 xl:col-span-2">
             <LineageFlow
               edges={edges}
               parentRunId={parentRunId}
