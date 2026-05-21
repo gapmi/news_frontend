@@ -1,338 +1,422 @@
 import { useMemo } from "react";
+import type { SankeyLink, SankeyNode, SankeyResponse } from "@/api/clustering";
 
-interface SankeyNodeMeta {
-  nameShort?: string | null;
-  nameTitle?: string | null;
-  tags?: string[] | null;
-}
-
-interface SankeyNode {
-  id: string;
-  label: string;
-  runId: number;
-  clusterId: number;
-  size: number;
-  depth: number;
-  meta?: SankeyNodeMeta;
-}
-
-interface SankeyLink {
-  id: string;
-  edgeId: number;
-  source: string;
-  target: string;
-  value: number;
-  overlapCount: number;
-  score: number;
-  overlapRatio: number;
-  similarity: number;
-}
-
-export interface MultiRunSankeyData {
-  nodes: SankeyNode[];
-  links: SankeyLink[];
-  stats?: {
-    nodeCount: number;
-    linkCount: number;
-    runCount: number;
-  };
-}
-
-interface MultiRunSankeyProps {
-  data: MultiRunSankeyData;
-  maxNodesPerColumn?: number;
-  maxLinks?: number;
+type Props = {
+  data: SankeyResponse;
   selectedEdgeId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
-}
+};
 
-interface LayoutNode extends SankeyNode {
+type LayoutNode = SankeyNode & {
   x: number;
   y: number;
   width: number;
   height: number;
-  shortLabel: string;
-  totalThroughput: number;
-}
+  columnIndex: number;
+  inbound: number;
+  outbound: number;
+  totalFlow: number;
+};
 
-interface LayoutLink extends SankeyLink {
+type LayoutLink = SankeyLink & {
   sourceNode: LayoutNode;
   targetNode: LayoutNode;
-}
+  strokeWidth: number;
+  path: string;
+  edgeId: number | null;
+};
 
-interface LayoutResult {
-  layoutNodes: LayoutNode[];
-  layoutLinks: LayoutLink[];
-  runIds: number[];
-}
+const SVG_WIDTH = 1400;
+const SVG_HEIGHT = 760;
+const PADDING_TOP = 84;
+const PADDING_LEFT = 56;
+const PADDING_RIGHT = 56;
+const COLUMN_NODE_WIDTH = 132;
+const COLUMN_GAP_MIN = 86;
+const NODE_GAP = 14;
+const MIN_NODE_HEIGHT = 22;
+const MAX_NODE_HEIGHT = 92;
+const MIN_STROKE = 2;
+const MAX_STROKE = 20;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
-}
-
-function truncate(value: string, max = 20) {
-  return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
 function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
+function getNodeLabel(node: SankeyNode) {
+  if (node.meta?.nameShort && node.meta.nameShort.trim().length > 0) {
+    return node.meta.nameShort;
+  }
+
+  if (node.label && node.label.trim().length > 0) {
+    return node.label;
+  }
+
+  return `C${node.clusterId}`;
+}
+
+function ellipsize(value: string, max = 24) {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
+}
+
+function getColumnX(columnIndex: number, columnCount: number) {
+  const innerWidth = SVG_WIDTH - PADDING_LEFT - PADDING_RIGHT - COLUMN_NODE_WIDTH;
+  const gap =
+    columnCount > 1
+      ? Math.max(COLUMN_GAP_MIN, innerWidth / (columnCount - 1))
+      : 0;
+
+  return PADDING_LEFT + columnIndex * gap;
+}
+
+function buildLinkPath(sourceNode: LayoutNode, targetNode: LayoutNode) {
+  const x1 = sourceNode.x + sourceNode.width;
+  const y1 = sourceNode.y + sourceNode.height / 2;
+  const x2 = targetNode.x;
+  const y2 = targetNode.y + targetNode.height / 2;
+  const dx = x2 - x1;
+  const curve = Math.max(40, dx * 0.42);
+
+  return `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`;
+}
+
+function getNumericEdgeId(link: SankeyLink): number | null {
+  const raw = (link as { edgeId?: number }).edgeId;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  return null;
+}
+
 export default function MultiRunSankey({
   data,
-  maxNodesPerColumn = 10,
-  maxLinks = 40,
   selectedEdgeId = null,
   onSelectEdge,
-}: MultiRunSankeyProps) {
-  const { layoutNodes, layoutLinks, runIds } = useMemo<LayoutResult>(() => {
-    if (!data.nodes.length || !data.links.length) {
+}: Props) {
+  const {
+    columns,
+    layoutNodes,
+    layoutLinks,
+    maxStrokeValue,
+    minRunId,
+    maxRunId,
+  } = useMemo(() => {
+    const nodes = data.nodes ?? [];
+    const links = data.links ?? [];
+
+    const grouped = new Map<number, SankeyNode[]>();
+    for (const node of nodes) {
+      const current = grouped.get(node.depth) ?? [];
+      current.push(node);
+      grouped.set(node.depth, current);
+    }
+
+    const sortedDepths = [...grouped.keys()].sort((a, b) => a - b);
+
+    const runIds = [...new Set(nodes.map((node) => node.runId))].sort((a, b) => a - b);
+    const minRunId = runIds[0] ?? null;
+    const maxRunId = runIds[runIds.length - 1] ?? null;
+
+    const inboundMap = new Map<string, number>();
+    const outboundMap = new Map<string, number>();
+
+    for (const link of links) {
+      inboundMap.set(link.target, (inboundMap.get(link.target) ?? 0) + link.value);
+      outboundMap.set(link.source, (outboundMap.get(link.source) ?? 0) + link.value);
+    }
+
+    const columns = sortedDepths.map((depth, columnIndex) => {
+      const columnNodes = [...(grouped.get(depth) ?? [])]
+        .map((node) => {
+          const inbound = inboundMap.get(node.id) ?? 0;
+          const outbound = outboundMap.get(node.id) ?? 0;
+          const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
+
+          return {
+            ...node,
+            inbound,
+            outbound,
+            totalFlow,
+            columnIndex,
+          };
+        })
+        .sort((a, b) => {
+          if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
+          if (b.size !== a.size) return b.size - a.size;
+          return a.clusterId - b.clusterId;
+        });
+
       return {
-        layoutNodes: [],
-        layoutLinks: [],
-        runIds: [],
+        depth,
+        columnIndex,
+        nodes: columnNodes,
       };
-    }
-
-    const throughput = new Map<string, number>();
-    for (const link of data.links) {
-      throughput.set(link.source, (throughput.get(link.source) ?? 0) + link.value);
-      throughput.set(link.target, (throughput.get(link.target) ?? 0) + link.value);
-    }
-
-    const nodesByDepth = new Map<number, SankeyNode[]>();
-    for (const node of data.nodes) {
-      const list = nodesByDepth.get(node.depth) ?? [];
-      list.push(node);
-      nodesByDepth.set(node.depth, list);
-    }
-
-    const depthLevels = [...nodesByDepth.keys()].sort((a, b) => a - b);
-    const columnCount = depthLevels.length;
-
-    const runIds = depthLevels.map((depth) => {
-      const sample = nodesByDepth.get(depth)?.[0];
-      return sample?.runId ?? depth;
     });
 
-    const svgWidth = 1200;
-    const columnWidth = 80;
-    const columnGap =
-      columnCount > 1
-        ? (svgWidth - columnWidth * columnCount) / (columnCount - 1 + 2)
-        : 0;
+    const allFlowValues = columns.flatMap((column) =>
+      column.nodes.map((node) => node.totalFlow || 1),
+    );
 
-    const topPadding = 40;
-    const verticalGap = 10;
-    const minHeight = 16;
-    const maxHeight = 60;
-
-    const allThroughputs = data.nodes.map((node) => throughput.get(node.id) ?? 0);
-    const globalMax = Math.max(...allThroughputs, 1);
+    const maxNodeFlow = Math.max(...allFlowValues, 1);
 
     const layoutNodes: LayoutNode[] = [];
 
-    depthLevels.forEach((depth, depthIndex) => {
-      const columnNodes = [...(nodesByDepth.get(depth) ?? [])];
+    for (const column of columns) {
+      const x = getColumnX(column.columnIndex, columns.length);
+      let currentY = PADDING_TOP;
 
-      columnNodes.sort((a, b) => {
-        const aValue = throughput.get(a.id) ?? 0;
-        const bValue = throughput.get(b.id) ?? 0;
-        return bValue - aValue;
-      });
-
-      const limitedNodes = columnNodes.slice(0, maxNodesPerColumn);
-      const x = columnGap + depthIndex * (columnWidth + columnGap);
-
-      let cursorY = topPadding;
-
-      for (const node of limitedNodes) {
-        const totalThroughput = throughput.get(node.id) ?? 0;
+      for (const node of column.nodes) {
         const height = clamp(
-          (totalThroughput / globalMax) * maxHeight,
-          minHeight,
-          maxHeight,
+          (node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT,
+          MIN_NODE_HEIGHT,
+          MAX_NODE_HEIGHT,
         );
 
-        const layoutNode: LayoutNode = {
+        layoutNodes.push({
           ...node,
           x,
-          y: cursorY,
-          width: columnWidth,
+          y: currentY,
+          width: COLUMN_NODE_WIDTH,
           height,
-          shortLabel:
-            node.meta?.nameShort?.trim() ||
-            node.meta?.nameTitle?.trim() ||
-            `C${node.clusterId}`,
-          totalThroughput,
-        };
+        });
 
-        cursorY += height + verticalGap;
-        layoutNodes.push(layoutNode);
+        currentY += height + NODE_GAP;
       }
-    });
-
-    const layoutNodeById = new Map<string, LayoutNode>(
-      layoutNodes.map((node) => [node.id, node]),
-    );
-
-    const limitedLinks = [...data.links]
-      .sort((a, b) => b.value - a.value)
-      .slice(0, maxLinks);
-
-    const layoutLinks: LayoutLink[] = [];
-
-    for (const link of limitedLinks) {
-      const sourceNode = layoutNodeById.get(link.source);
-      const targetNode = layoutNodeById.get(link.target);
-
-      if (!sourceNode || !targetNode) {
-        continue;
-      }
-
-      layoutLinks.push({
-        ...link,
-        sourceNode,
-        targetNode,
-      });
     }
 
+    const layoutNodeMap = new Map<string, LayoutNode>();
+    for (const node of layoutNodes) {
+      layoutNodeMap.set(node.id, node);
+    }
+
+    const maxStrokeValue = Math.max(...links.map((link) => link.value), 1);
+
+    const layoutLinks: LayoutLink[] = links
+      .map((link) => {
+        const sourceNode = layoutNodeMap.get(link.source);
+        const targetNode = layoutNodeMap.get(link.target);
+
+        if (!sourceNode || !targetNode) {
+          return null;
+        }
+
+        const strokeWidth = clamp(
+          (link.value / maxStrokeValue) * MAX_STROKE,
+          MIN_STROKE,
+          MAX_STROKE,
+        );
+
+        return {
+          ...link,
+          sourceNode,
+          targetNode,
+          strokeWidth,
+          path: buildLinkPath(sourceNode, targetNode),
+          edgeId: getNumericEdgeId(link),
+        };
+      })
+      .filter(Boolean) as LayoutLink[];
+
     return {
+      columns,
       layoutNodes,
       layoutLinks,
-      runIds,
+      maxStrokeValue,
+      minRunId,
+      maxRunId,
     };
-  }, [data, maxNodesPerColumn, maxLinks]);
+  }, [data]);
 
-  if (!layoutNodes.length || !layoutLinks.length) {
+  if (!data.nodes.length) {
     return (
-      <div className="rounded-md border border-dashed p-8 text-sm text-muted-foreground">
-        No multi-run lineage data for this range.
+      <div className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
+        No Sankey data available for this run window.
       </div>
     );
   }
 
-  const svgWidth = 1200;
-  const svgHeight = 560;
-  const maxValue = Math.max(...layoutLinks.map((link) => link.value), 1);
-
   return (
-    <section className="rounded-lg border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-baseline justify-between">
+    <section>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-medium">Multi-run lineage</h2>
+          <h3 className="text-base font-medium">Multi-run lineage</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Runs: {runIds.join(" → ")}. Width of bands encodes overlap.
+            Runs {minRunId ?? "—"} → {maxRunId ?? "—"}. Width of bands encodes overlap.
           </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+          <div className="rounded-md border bg-background px-3 py-2">
+            Nodes: <span className="font-medium text-foreground">{data.stats.nodeCount}</span>
+          </div>
+          <div className="rounded-md border bg-background px-3 py-2">
+            Links: <span className="font-medium text-foreground">{data.stats.linkCount}</span>
+          </div>
+          <div className="rounded-md border bg-background px-3 py-2">
+            Runs: <span className="font-medium text-foreground">{data.stats.runCount}</span>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="h-[560px] w-full min-w-[900px]"
+          viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+          className="h-[760px] w-full min-w-[1200px]"
           role="img"
-          aria-label={`Lineage across runs ${runIds.join(" to ")}`}
+          aria-label={`Multi-run lineage from run ${minRunId ?? "unknown"} to run ${maxRunId ?? "unknown"}`}
         >
           <defs>
-            <linearGradient
-              id="multiSankeyGradient"
-              x1="0%"
-              y1="0%"
-              x2="100%"
-              y2="0%"
-            >
-              <stop offset="0%" stopColor="#9ca3af" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#9ca3af" stopOpacity="0.85" />
+            <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
+              <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.42" />
+              <stop offset="50%" stopColor="#9ca3af" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.42" />
             </linearGradient>
+
+            <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="1" stdDeviation="1.8" floodColor="#0f172a" floodOpacity="0.08" />
+            </filter>
           </defs>
 
-          {runIds.map((runId, index) => {
-            const columnNode = layoutNodes.find((node) => node.depth === index);
-            if (!columnNode) return null;
-
-            const centerX = columnNode.x + columnNode.width / 2;
+          {columns.map((column) => {
+            const runId = column.nodes[0]?.runId;
 
             return (
-              <text
-                key={runId}
-                x={centerX}
-                y={20}
-                fontSize={12}
-                textAnchor="middle"
-                fill="#4b5563"
-              >
-                Run {runId}
-              </text>
+              <g key={`col-${column.depth}`}>
+                <text
+                  x={getColumnX(column.columnIndex, columns.length) + COLUMN_NODE_WIDTH / 2}
+                  y={40}
+                  textAnchor="middle"
+                  fontSize="14"
+                  fontWeight="600"
+                  fill="#52525b"
+                >
+                  Run {runId ?? "—"}
+                </text>
+              </g>
             );
           })}
 
           {layoutLinks.map((link) => {
-            const y1 = link.sourceNode.y + link.sourceNode.height / 2;
-            const y2 = link.targetNode.y + link.targetNode.height / 2;
-            const x1 = link.sourceNode.x + link.sourceNode.width;
-            const x2 = link.targetNode.x;
-            const midX = (x1 + x2) / 2;
-
-            const path = `
-              M ${x1} ${y1}
-              C ${midX} ${y1},
-                ${midX} ${y2},
-                ${x2} ${y2}
-            `;
-
-            const strokeWidth = clamp((link.value / maxValue) * 18, 2, 18);
-            const isSelected = selectedEdgeId === link.edgeId;
+            const isSelected =
+              selectedEdgeId !== null &&
+              link.edgeId !== null &&
+              selectedEdgeId === link.edgeId;
 
             return (
               <path
                 key={link.id}
-                d={path}
+                d={link.path}
                 fill="none"
-                stroke="url(#multiSankeyGradient)"
-                strokeWidth={strokeWidth}
-                strokeOpacity={isSelected ? 0.9 : 0.4}
+                stroke="url(#sankey-band-gradient)"
+                strokeWidth={link.strokeWidth}
+                strokeOpacity={isSelected ? 0.95 : 0.52}
                 strokeLinecap="round"
                 className="cursor-pointer transition-opacity"
-                onClick={() => onSelectEdge?.(link.edgeId)}
+                onClick={() => {
+                  if (link.edgeId !== null) {
+                    onSelectEdge?.(link.edgeId);
+                  }
+                }}
               >
                 <title>
-                  {`Edge ${link.edgeId}
-value ${link.value} · overlap ${link.overlapCount}
-score ${formatNumber(link.score, 3)} · sim ${formatNumber(link.similarity, 3)}`}
+                  {`${getNodeLabel(link.sourceNode)} → ${getNodeLabel(link.targetNode)}
+Overlap: ${link.value}
+Score: ${formatNumber(link.score, 3)}
+Similarity: ${formatNumber(link.similarity, 3)}`}
                 </title>
               </path>
             );
           })}
 
-          {layoutNodes.map((node) => (
-            <g key={node.id}>
-              <rect
-                x={node.x}
-                y={node.y}
-                width={node.width}
-                height={node.height}
-                rx={3}
-                fill="#e5e7eb"
-                stroke="#9ca3af"
-              />
-              <text
-                x={node.x - 6}
-                y={node.y + node.height / 2}
-                fontSize={11}
-                textAnchor="end"
-                dominantBaseline="middle"
-                fill="#111827"
-              >
-                {truncate(node.shortLabel)}
-              </text>
-            </g>
-          ))}
+          {layoutNodes.map((node) => {
+            const label = getNodeLabel(node);
+            const shortLabel = ellipsize(label, 22);
+            const hasSelectedConnection =
+              selectedEdgeId !== null &&
+              layoutLinks.some(
+                (link) =>
+                  link.edgeId === selectedEdgeId &&
+                  (link.sourceNode.id === node.id || link.targetNode.id === node.id),
+              );
+
+            return (
+              <g key={node.id} filter="url(#node-shadow)">
+                <rect
+                  x={node.x}
+                  y={node.y}
+                  width={node.width}
+                  height={node.height}
+                  rx={10}
+                  fill={hasSelectedConnection ? "#e2e8f0" : "#f3f4f6"}
+                  stroke={hasSelectedConnection ? "#94a3b8" : "#d1d5db"}
+                />
+
+                <text
+                  x={node.x + 10}
+                  y={node.y + 20}
+                  fontSize="12.5"
+                  fontWeight="600"
+                  fill="#111827"
+                >
+                  {shortLabel}
+                </text>
+
+                {node.height >= 42 && (
+                  <>
+                    <text
+                      x={node.x + 10}
+                      y={node.y + 37}
+                      fontSize="10.5"
+                      fill="#475569"
+                    >
+                      {`C${node.clusterId} · size ${node.size}`}
+                    </text>
+                    <text
+                      x={node.x + 10}
+                      y={node.y + 51}
+                      fontSize="10.5"
+                      fill="#64748b"
+                    >
+                      {`flow ${formatNumber(node.totalFlow, 0)}`}
+                    </text>
+                  </>
+                )}
+
+                <title>
+                  {`${label}
+Run ${node.runId}
+Cluster ${node.clusterId}
+Size ${node.size}
+Inbound ${formatNumber(node.inbound, 0)}
+Outbound ${formatNumber(node.outbound, 0)}`}
+                </title>
+              </g>
+            );
+          })}
+
+          <text
+            x={PADDING_LEFT}
+            y={SVG_HEIGHT - 18}
+            fontSize="12"
+            fill="#6b7280"
+          >
+            Bands connect clusters across runs. Click a band to sync with Euler detail or the lineage table.
+          </text>
         </svg>
       </div>
 
-      <div className="mt-3 text-xs text-muted-foreground">
-        Bands connect clusters across runs. Click a band to sync with Euler detail or the lineage table.
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <div className="rounded-md border bg-background px-3 py-2">
+          Thickest band: <span className="font-medium text-foreground">{formatNumber(maxStrokeValue, 0)}</span>
+        </div>
+        <div className="rounded-md border bg-background px-3 py-2">
+          Selected edge: <span className="font-medium text-foreground">{selectedEdgeId ?? "—"}</span>
+        </div>
       </div>
     </section>
   );
