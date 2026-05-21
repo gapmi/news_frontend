@@ -1,4 +1,3 @@
-// src/components/charts/MultiRunSankey.tsx
 import { useMemo } from "react";
 
 interface SankeyNodeMeta {
@@ -95,10 +94,6 @@ export default function MultiRunSankey({
       };
     }
 
-    const nodeById = new Map<string, SankeyNode>(
-      data.nodes.map((node) => [node.id, node]),
-    );
-
     const throughput = new Map<string, number>();
     for (const link of data.links) {
       throughput.set(link.source, (throughput.get(link.source) ?? 0) + link.value);
@@ -121,7 +116,6 @@ export default function MultiRunSankey({
     });
 
     const svgWidth = 1200;
-    const svgHeight = 560;
     const columnWidth = 80;
     const columnGap =
       columnCount > 1
@@ -139,7 +133,7 @@ export default function MultiRunSankey({
     const layoutNodes: LayoutNode[] = [];
 
     depthLevels.forEach((depth, depthIndex) => {
-      const columnNodes = nodesByDepth.get(depth) ?? [];
+      const columnNodes = [...(nodesByDepth.get(depth) ?? [])];
 
       columnNodes.sort((a, b) => {
         const aValue = throughput.get(a.id) ?? 0;

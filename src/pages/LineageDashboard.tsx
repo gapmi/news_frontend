@@ -11,7 +11,6 @@ import {
 } from "@/api/clustering";
 import LineageFlow from "@/components/charts/LineageFlow";
 import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
-import LineageSankey from "@/components/charts/LineageSankey";
 import MultiRunSankey from "@/components/charts/MultiRunSankey";
 
 function formatDateTime(value: string | null) {
@@ -27,15 +26,14 @@ function formatClusterRef(clusterId: number, label?: string | null) {
   return label ? `${label} · C${clusterId}` : `Cluster ${clusterId}`;
 }
 
-type RunPair = {
-  parentRunId: number;
-  childRunId: number;
-};
+interface RunRange {
+  startRunId: number;
+  endRunId: number;
+}
 
 export default function LineageDashboard() {
-  const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
-  const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
-  const [pairIndex, setPairIndex] = useState<number>(0);
+  const [manualStartRunId, setManualStartRunId] = useState<number | null>(null);
+  const [manualEndRunId, setManualEndRunId] = useState<number | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
 
@@ -65,112 +63,76 @@ export default function LineageDashboard() {
     return [...new Set(lineageRuns.map((run) => run.runId))].sort((a, b) => a - b);
   }, [lineageRuns]);
 
-  const availablePairs = useMemo<RunPair[]>(() => {
+  const defaultRange = useMemo<RunRange | null>(() => {
     if (sortedLineageRunIds.length < 2) {
-      return [];
+      return null;
     }
 
-    return sortedLineageRunIds
-      .slice(0, -1)
-      .map((parentRunId, index) => ({
-        parentRunId,
-        childRunId: sortedLineageRunIds[index + 1],
-      }))
-      .filter((pair) => pair.parentRunId < pair.childRunId);
+    return {
+      startRunId: sortedLineageRunIds[0],
+      endRunId: sortedLineageRunIds[sortedLineageRunIds.length - 1],
+    };
   }, [sortedLineageRunIds]);
 
+  const startRunId = manualStartRunId ?? defaultRange?.startRunId ?? null;
+  const endRunId = manualEndRunId ?? defaultRange?.endRunId ?? null;
+
+  const isValidRange =
+    startRunId !== null &&
+    endRunId !== null &&
+    startRunId < endRunId;
+
   useEffect(() => {
-    if (availablePairs.length === 0) {
-      setPairIndex(0);
-      return;
+    if (
+      manualStartRunId !== null &&
+      manualEndRunId !== null &&
+      manualStartRunId >= manualEndRunId
+    ) {
+      const nextEndRunId = sortedLineageRunIds.find(
+        (runId) => runId > manualStartRunId,
+      );
+      setManualEndRunId(nextEndRunId ?? null);
     }
+  }, [manualStartRunId, manualEndRunId, sortedLineageRunIds]);
 
-    setPairIndex((current) => Math.min(current, availablePairs.length - 1));
-  }, [availablePairs]);
-
-  const activePair = availablePairs[pairIndex] ?? null;
-
-  const parentOptions = useMemo(() => {
-    return [...new Set(availablePairs.map((pair) => pair.parentRunId))];
-  }, [availablePairs]);
-
-  const parentRunId = manualParentRunId ?? activePair?.parentRunId ?? null;
-
-  const childOptions = useMemo(() => {
-    if (parentRunId === null) {
+  const rangeRunIds = useMemo(() => {
+    if (!isValidRange || startRunId === null || endRunId === null) {
       return [];
     }
 
-    return availablePairs
-      .filter((pair) => pair.parentRunId === parentRunId)
-      .map((pair) => pair.childRunId);
-  }, [availablePairs, parentRunId]);
-
-  const childRunHelperText = useMemo(() => {
-    if (parentRunId === null) {
-      return "Choose a parent run to see valid child runs";
-    }
-
-    if (childOptions.length === 0) {
-      return `No valid child runs for parent ${parentRunId}`;
-    }
-
-    return `Available for parent ${parentRunId}: ${childOptions.join(", ")}`;
-  }, [parentRunId, childOptions]);
-
-  const childRunId = useMemo(() => {
-    if (manualChildRunId !== null && childOptions.includes(manualChildRunId)) {
-      return manualChildRunId;
-    }
-
-    if (
-      activePair &&
-      activePair.parentRunId === parentRunId &&
-      childOptions.includes(activePair.childRunId)
-    ) {
-      return activePair.childRunId;
-    }
-
-    return childOptions[0] ?? null;
-  }, [manualChildRunId, childOptions, activePair, parentRunId]);
-
-  useEffect(() => {
-    if (parentRunId === null) {
-      setManualChildRunId(null);
-      return;
-    }
-
-    if (childOptions.length === 0) {
-      setManualChildRunId(null);
-      return;
-    }
-
-    if (childRunId === null || !childOptions.includes(childRunId)) {
-      setManualChildRunId(childOptions[0]);
-    }
-  }, [parentRunId, childOptions, childRunId]);
-
-  useEffect(() => {
-    if (parentRunId === null || childRunId === null) {
-      return;
-    }
-
-    const nextIndex = availablePairs.findIndex(
-      (pair) =>
-        pair.parentRunId === parentRunId &&
-        pair.childRunId === childRunId,
+    return sortedLineageRunIds.filter(
+      (runId) => runId >= startRunId && runId <= endRunId,
     );
+  }, [isValidRange, startRunId, endRunId, sortedLineageRunIds]);
 
-    if (nextIndex >= 0) {
-      setPairIndex(nextIndex);
+  const pairOptions = useMemo(() => {
+    if (rangeRunIds.length < 2) {
+      return [];
     }
-  }, [availablePairs, parentRunId, childRunId]);
+
+    return rangeRunIds.slice(0, -1).map((parentRunId, index) => ({
+      parentRunId,
+      childRunId: rangeRunIds[index + 1],
+    }));
+  }, [rangeRunIds]);
+
+  const activePair = pairOptions[pairOptions.length - 1] ?? null;
+  const parentRunId = activePair?.parentRunId ?? null;
+  const childRunId = activePair?.childRunId ?? null;
+
+  const sankeyParams =
+    isValidRange && startRunId !== null && endRunId !== null
+      ? {
+          start_run_id: startRunId,
+          end_run_id: endRunId,
+          min_score: minScore,
+        }
+      : null;
 
   const edgeParams =
     parentRunId !== null &&
     childRunId !== null &&
-    parentRunId < childRunId &&
-    childOptions.includes(childRunId)
+    parentRunId < childRunId
       ? {
           parent_run_id: parentRunId,
           child_run_id: childRunId,
@@ -179,16 +141,14 @@ export default function LineageDashboard() {
         }
       : null;
 
-  const sankeyParams =
-    parentRunId !== null &&
-    childRunId !== null &&
-    parentRunId < childRunId
-      ? {
-          start_run_id: parentRunId,
-          end_run_id: childRunId,
-          min_score: minScore,
-        }
-      : null;
+  const sankeyQuery = useQuery({
+    queryKey: sankeyParams
+      ? clusteringKeys.sankey(sankeyParams)
+      : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
+    queryFn: () => getSankeyView(sankeyParams!),
+    enabled: Boolean(sankeyParams),
+    placeholderData: keepPreviousData,
+  });
 
   const edgesQuery = useQuery({
     queryKey: edgeParams
@@ -196,15 +156,6 @@ export default function LineageDashboard() {
       : clusteringKeys.lineageEdges({ limit: 50 }),
     queryFn: () => getLineageEdges(edgeParams!),
     enabled: Boolean(edgeParams),
-    placeholderData: keepPreviousData,
-  });
-
-  const sankeyQuery = useQuery({
-    queryKey: sankeyParams
-      ? clusteringKeys.sankey(sankeyParams)
-      : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
-    queryFn: () => getSankeyView(sankeyParams!),
-    enabled: Boolean(sankeyParams),
     placeholderData: keepPreviousData,
   });
 
@@ -231,23 +182,13 @@ export default function LineageDashboard() {
   const selectedParentLabel = eulerQuery.data?.parent.label ?? null;
   const selectedChildLabel = eulerQuery.data?.child.label ?? null;
 
-  const canStepBackward = availablePairs.length > 0 && pairIndex > 0;
-  const canStepForward =
-    availablePairs.length > 0 && pairIndex < availablePairs.length - 1;
-
-  function stepToPair(nextIndex: number) {
-    const boundedIndex = Math.max(0, Math.min(nextIndex, availablePairs.length - 1));
-    const nextPair = availablePairs[boundedIndex];
-
-    if (!nextPair) {
-      return;
+  const endRunOptions = useMemo(() => {
+    if (startRunId === null) {
+      return sortedLineageRunIds;
     }
 
-    setPairIndex(boundedIndex);
-    setManualParentRunId(null);
-    setManualChildRunId(null);
-    setSelectedEdgeId(null);
-  }
+    return sortedLineageRunIds.filter((runId) => runId > startRunId);
+  }, [sortedLineageRunIds, startRunId]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -321,22 +262,16 @@ export default function LineageDashboard() {
 
           <div className="mt-4 grid gap-4 md:grid-cols-4">
             <label className="flex flex-col gap-2 text-sm">
-              Parent run
+              Start run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={parentRunId ?? ""}
+                value={startRunId ?? ""}
                 onChange={(event) => {
-                  const nextParentRunId = Number(event.target.value);
-                  const nextChildOptions = availablePairs
-                    .filter((pair) => pair.parentRunId === nextParentRunId)
-                    .map((pair) => pair.childRunId);
-
-                  setManualParentRunId(nextParentRunId);
-                  setManualChildRunId(nextChildOptions[0] ?? null);
+                  setManualStartRunId(Number(event.target.value));
                   setSelectedEdgeId(null);
                 }}
               >
-                {parentOptions.map((runId) => (
+                {sortedLineageRunIds.map((runId) => (
                   <option key={runId} value={runId}>
                     Run {runId}
                   </option>
@@ -345,30 +280,22 @@ export default function LineageDashboard() {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              Child run
+              End run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={childRunId ?? ""}
+                value={endRunId ?? ""}
                 onChange={(event) => {
-                  setManualChildRunId(Number(event.target.value));
+                  setManualEndRunId(Number(event.target.value));
                   setSelectedEdgeId(null);
                 }}
-                disabled={childOptions.length === 0}
-                aria-describedby="child-run-helper"
+                disabled={endRunOptions.length === 0}
               >
-                {childOptions.map((runId) => (
+                {endRunOptions.map((runId) => (
                   <option key={runId} value={runId}>
                     Run {runId}
                   </option>
                 ))}
               </select>
-
-              <span
-                id="child-run-helper"
-                className="text-xs text-muted-foreground"
-              >
-                {childRunHelperText}
-              </span>
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
@@ -388,26 +315,33 @@ export default function LineageDashboard() {
             </label>
 
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              {parentRunId !== null && childRunId !== null ? (
+              {isValidRange && startRunId !== null && endRunId !== null ? (
                 <div className="space-y-1">
-                  <div>{`Selected pair: ${parentRunId} → ${childRunId}`}</div>
-
+                  <div>{`Selected range: ${startRunId} → ${endRunId}`}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {`Runs in range: ${rangeRunIds.length}`}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {activePair
+                      ? `Detail pair: ${activePair.parentRunId} → ${activePair.childRunId}`
+                      : "No adjacent pair inside range"}
+                  </div>
                   {edgesQuery.isLoading ? (
                     <div className="text-xs text-muted-foreground">
-                      Loading edges for selected pair...
+                      Loading edges for detail pair...
                     </div>
                   ) : edgesQuery.error ? (
                     <div className="text-xs text-red-600">
-                      Failed to load edges for selected pair
+                      Failed to load edges for detail pair
                     </div>
                   ) : (
                     <div className="text-xs text-muted-foreground">
-                      {`Edges for pair: ${pairEdgeCount}`}
+                      {`Edges for detail pair: ${pairEdgeCount}`}
                     </div>
                   )}
                 </div>
               ) : (
-                "No valid lineage pair available"
+                "No valid lineage range available"
               )}
             </div>
           </div>
@@ -440,71 +374,45 @@ export default function LineageDashboard() {
               </div>
             </div>
           )}
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              className="rounded-md border bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => stepToPair(pairIndex - 1)}
-              disabled={!canStepBackward}
-            >
-              Previous pair
-            </button>
-
-            <button
-              type="button"
-              className="rounded-md border bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => stepToPair(pairIndex + 1)}
-              disabled={!canStepForward}
-            >
-              Next pair
-            </button>
-
-            <div className="flex items-center text-sm text-muted-foreground">
-              {availablePairs.length > 0
-                ? `Pair ${pairIndex + 1} of ${availablePairs.length}`
-                : "No adjacent lineage pairs available"}
-            </div>
-          </div>
         </section>
 
-<section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
-  <h2 className="text-lg font-medium">Multi-run lineage</h2>
+        <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+          <h2 className="text-lg font-medium">Multi-run lineage</h2>
 
-  {sankeyQuery.isLoading && (
-    <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
-  )}
+          {sankeyQuery.isLoading && (
+            <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
+          )}
 
-  {sankeyQuery.error && (
-    <p className="mt-3 text-sm text-red-600">
-      {(sankeyQuery.error as Error).message}
-    </p>
-  )}
+          {sankeyQuery.error && (
+            <p className="mt-3 text-sm text-red-600">
+              {(sankeyQuery.error as Error).message}
+            </p>
+          )}
 
-  {sankeyQuery.data && (
-    <>
-      <div className="mt-3 text-sm text-muted-foreground">
-        Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
-        {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
-        {sankeyQuery.data.stats?.runCount ?? "—"}
-      </div>
+          {sankeyQuery.data && (
+            <>
+              <div className="mt-3 text-sm text-muted-foreground">
+                Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
+                {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
+                {sankeyQuery.data.stats?.runCount ?? "—"}
+              </div>
 
-      <div className="mt-4">
-        <MultiRunSankey
-          data={sankeyQuery.data}
-          selectedEdgeId={selectedEdgeId}
-          onSelectEdge={setSelectedEdgeId}
-        />
-      </div>
-    </>
-  )}
+              <div className="mt-4">
+                <MultiRunSankey
+                  data={sankeyQuery.data}
+                  selectedEdgeId={selectedEdgeId}
+                  onSelectEdge={setSelectedEdgeId}
+                />
+              </div>
+            </>
+          )}
 
-  {!sankeyQuery.isLoading && !sankeyQuery.error && !sankeyQuery.data && (
-    <p className="mt-3 text-sm text-muted-foreground">
-      No Sankey data for this range.
-    </p>
-  )}
-</section>
+          {!sankeyQuery.isLoading && !sankeyQuery.error && !sankeyQuery.data && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              No Sankey data for this range.
+            </p>
+          )}
+        </section>
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-lg border bg-card p-4 shadow-sm">
@@ -586,7 +494,7 @@ export default function LineageDashboard() {
                         colSpan={6}
                         className="py-4 text-sm text-muted-foreground"
                       >
-                        No lineage edges found for this pair and score threshold.
+                        No lineage edges found for the active detail pair and score threshold.
                       </td>
                     </tr>
                   )}

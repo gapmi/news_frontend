@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   clusteringKeys,
@@ -9,6 +9,7 @@ import {
   getSankeyView,
   type LineageEdge,
 } from "@/api/clustering";
+import { getLineageWindow } from "@/utils/lineageWindow";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -19,71 +20,163 @@ function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
+interface RunPair {
+  parentRunId: number;
+  childRunId: number;
+}
+
 export default function Lineage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const [minScore, setMinScore] = useState(0);
+  const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
+  const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
 
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 10 }),
     queryFn: () => getClusteringRuns({ status: "success", limit: 10 }),
   });
 
-  const defaultRange = useMemo(() => {
-    const runs = runsQuery.data?.items ?? [];
-    const runsWithLineage = runs
-      .filter((run) => run.parentLineageEdgeCount > 0 || run.childLineageEdgeCount > 0)
-      .map((run) => run.runId);
+  const runs = runsQuery.data?.items ?? [];
 
-    if (runsWithLineage.length === 0) {
+  const lineageRuns = useMemo(() => {
+    return runs.filter(
+      (run) => run.parentLineageEdgeCount > 0 || run.childLineageEdgeCount > 0,
+    );
+  }, [runs]);
+
+  const sortedLineageRunIds = useMemo(() => {
+    return [...new Set(lineageRuns.map((run) => run.runId))].sort((a, b) => a - b);
+  }, [lineageRuns]);
+
+  const availablePairs = useMemo<RunPair[]>(() => {
+    if (sortedLineageRunIds.length < 2) {
+      return [];
+    }
+
+    return sortedLineageRunIds
+      .slice(0, -1)
+      .map((parentRunId, index) => ({
+        parentRunId,
+        childRunId: sortedLineageRunIds[index + 1],
+      }))
+      .filter((pair) => pair.parentRunId < pair.childRunId);
+  }, [sortedLineageRunIds]);
+
+  const defaultPair = availablePairs[0] ?? null;
+
+  const parentOptions = useMemo(() => {
+    return [...new Set(availablePairs.map((pair) => pair.parentRunId))];
+  }, [availablePairs]);
+
+  const parentRunId = manualParentRunId ?? defaultPair?.parentRunId ?? null;
+
+  const childOptions = useMemo(() => {
+    if (parentRunId === null) {
+      return [];
+    }
+
+    return availablePairs
+      .filter((pair) => pair.parentRunId === parentRunId)
+      .map((pair) => pair.childRunId);
+  }, [availablePairs, parentRunId]);
+
+  const childRunId = useMemo(() => {
+    if (manualChildRunId !== null && childOptions.includes(manualChildRunId)) {
+      return manualChildRunId;
+    }
+
+    const defaultChild = availablePairs.find(
+      (pair) => pair.parentRunId === parentRunId,
+    )?.childRunId;
+
+    if (defaultChild !== undefined && childOptions.includes(defaultChild)) {
+      return defaultChild;
+    }
+
+    return childOptions[0] ?? null;
+  }, [manualChildRunId, childOptions, availablePairs, parentRunId]);
+
+  useEffect(() => {
+    if (parentRunId === null) {
+      setManualChildRunId(null);
+      return;
+    }
+
+    if (childOptions.length === 0) {
+      setManualChildRunId(null);
+      return;
+    }
+
+    if (childRunId === null || !childOptions.includes(childRunId)) {
+      setManualChildRunId(childOptions[0]);
+    }
+  }, [parentRunId, childOptions, childRunId]);
+
+  const childRunHelperText = useMemo(() => {
+    if (parentRunId === null) {
+      return "Choose a parent run to see valid child runs";
+    }
+
+    if (childOptions.length === 0) {
+      return `No valid child runs for parent ${parentRunId}`;
+    }
+
+    return `Available for parent ${parentRunId}: ${childOptions.join(", ")}`;
+  }, [parentRunId, childOptions]);
+
+  const sankeyWindow = useMemo(() => {
+    if (parentRunId === null) {
       return null;
     }
 
-    return {
-      startRunId: Math.min(...runsWithLineage),
-      endRunId: Math.max(...runsWithLineage),
-    };
-  }, [runsQuery.data]);
+    return getLineageWindow(sortedLineageRunIds, parentRunId, 5);
+  }, [sortedLineageRunIds, parentRunId]);
 
-  const [manualStartRunId, setManualStartRunId] = useState<number | null>(null);
-  const [manualEndRunId, setManualEndRunId] = useState<number | null>(null);
-
-  const startRunId = manualStartRunId ?? defaultRange?.startRunId ?? null;
-  const endRunId = manualEndRunId ?? defaultRange?.endRunId ?? null;
-
-  const viewParams = startRunId && endRunId
+  const sankeyParams = sankeyWindow
     ? {
-        start_run_id: startRunId,
-        end_run_id: endRunId,
+        start_run_id: sankeyWindow.startRunId,
+        end_run_id: sankeyWindow.endRunId,
         min_score: minScore,
       }
     : null;
 
+  const graphParams = sankeyWindow
+    ? {
+        start_run_id: sankeyWindow.startRunId,
+        end_run_id: sankeyWindow.endRunId,
+        min_score: minScore,
+      }
+    : null;
+
+  const edgeParams =
+    parentRunId !== null &&
+    childRunId !== null &&
+    parentRunId < childRunId
+      ? {
+          parent_run_id: parentRunId,
+          child_run_id: childRunId,
+          min_score: minScore,
+          limit: 20,
+        }
+      : null;
+
   const sankeyQuery = useQuery({
-    queryKey: viewParams
-      ? clusteringKeys.sankey(viewParams)
+    queryKey: sankeyParams
+      ? clusteringKeys.sankey(sankeyParams)
       : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
-    queryFn: () => getSankeyView(viewParams!),
-    enabled: Boolean(viewParams),
+    queryFn: () => getSankeyView(sankeyParams!),
+    enabled: Boolean(sankeyParams),
     placeholderData: keepPreviousData,
   });
 
   const graphQuery = useQuery({
-    queryKey: viewParams
-      ? clusteringKeys.graph(viewParams)
+    queryKey: graphParams
+      ? clusteringKeys.graph(graphParams)
       : clusteringKeys.graph({ start_run_id: 0, end_run_id: 0 }),
-    queryFn: () => getGraphView(viewParams!),
-    enabled: Boolean(viewParams),
+    queryFn: () => getGraphView(graphParams!),
+    enabled: Boolean(graphParams),
     placeholderData: keepPreviousData,
   });
-
-  const edgeParams = startRunId && endRunId
-    ? {
-        parent_run_id: startRunId,
-        child_run_id: startRunId + 1,
-        min_score: minScore,
-        limit: 20,
-      }
-    : null;
 
   const edgesQuery = useQuery({
     queryKey: edgeParams
@@ -102,7 +195,6 @@ export default function Lineage() {
     enabled: selectedEdgeId !== null,
   });
 
-  const runs = runsQuery.data?.items ?? [];
   const edges = edgesQuery.data?.items ?? [];
 
   return (
@@ -122,33 +214,54 @@ export default function Lineage() {
 
           <div className="grid gap-4 md:grid-cols-4">
             <label className="flex flex-col gap-2 text-sm">
-              Start run
+              Parent run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={startRunId ?? ""}
-                onChange={(event) => setManualStartRunId(Number(event.target.value))}
+                value={parentRunId ?? ""}
+                onChange={(event) => {
+                  const nextParentRunId = Number(event.target.value);
+                  const nextChildOptions = availablePairs
+                    .filter((pair) => pair.parentRunId === nextParentRunId)
+                    .map((pair) => pair.childRunId);
+
+                  setManualParentRunId(nextParentRunId);
+                  setManualChildRunId(nextChildOptions[0] ?? null);
+                  setSelectedEdgeId(null);
+                }}
               >
-                {runs.map((run) => (
-                  <option key={run.runId} value={run.runId}>
-                    Run {run.runId}
+                {parentOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              End run
+              Child run
               <select
                 className="rounded-md border bg-background px-3 py-2"
-                value={endRunId ?? ""}
-                onChange={(event) => setManualEndRunId(Number(event.target.value))}
+                value={childRunId ?? ""}
+                onChange={(event) => {
+                  setManualChildRunId(Number(event.target.value));
+                  setSelectedEdgeId(null);
+                }}
+                disabled={childOptions.length === 0}
+                aria-describedby="child-run-helper"
               >
-                {runs.map((run) => (
-                  <option key={run.runId} value={run.runId}>
-                    Run {run.runId}
+                {childOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
                   </option>
                 ))}
               </select>
+
+              <span
+                id="child-run-helper"
+                className="text-xs text-muted-foreground"
+              >
+                {childRunHelperText}
+              </span>
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
@@ -160,14 +273,31 @@ export default function Lineage() {
                 max={1}
                 step={0.05}
                 value={minScore}
-                onChange={(event) => setMinScore(Number(event.target.value))}
+                onChange={(event) => {
+                  setMinScore(Number(event.target.value));
+                  setSelectedEdgeId(null);
+                }}
               />
             </label>
 
-            <div className="flex items-end text-sm text-muted-foreground">
-              {startRunId && endRunId
-                ? `Range: ${startRunId} → ${endRunId}`
-                : "No lineage range available"}
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {parentRunId !== null ? (
+                <div className="space-y-1">
+                  <div>Anchor run: {parentRunId}</div>
+                  <div>
+                    Pair: {parentRunId ?? "—"} → {childRunId ?? "—"}
+                  </div>
+                  <div>
+                    Sankey window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                    {sankeyWindow?.endRunId ?? "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Runs in window: {sankeyWindow?.runIds.length ?? 0}
+                  </div>
+                </div>
+              ) : (
+                "No lineage pair available"
+              )}
             </div>
           </div>
         </section>
@@ -186,6 +316,10 @@ export default function Lineage() {
                 <div>Nodes: {sankeyQuery.data.stats.nodeCount}</div>
                 <div>Links: {sankeyQuery.data.stats.linkCount}</div>
                 <div>Runs: {sankeyQuery.data.stats.runCount}</div>
+                <div>
+                  Window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                  {sankeyWindow?.endRunId ?? "—"}
+                </div>
               </dl>
             )}
           </div>
@@ -203,6 +337,10 @@ export default function Lineage() {
                 <div>Nodes: {graphQuery.data.stats.nodeCount}</div>
                 <div>Edges: {graphQuery.data.stats.edgeCount}</div>
                 <div>Groups: {graphQuery.data.groups.length}</div>
+                <div>
+                  Window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                  {sankeyWindow?.endRunId ?? "—"}
+                </div>
               </dl>
             )}
           </div>
@@ -215,7 +353,16 @@ export default function Lineage() {
                 <div>Total loaded: {runs.length}</div>
                 <div>Latest: {runs[0]?.runId ?? "—"}</div>
                 <div>
-                  Default range: {defaultRange ? `${defaultRange.startRunId} → ${defaultRange.endRunId}` : "—"}
+                  First with lineage: {sortedLineageRunIds[0] ?? "—"}
+                </div>
+                <div>
+                  Last with lineage: {sortedLineageRunIds[sortedLineageRunIds.length - 1] ?? "—"}
+                </div>
+                <div>
+                  Anchor updated window around selected parent run.
+                </div>
+                <div>
+                  Latest started: {formatDate(runs[0]?.startedAt ?? null)}
                 </div>
               </dl>
             )}
@@ -265,6 +412,14 @@ export default function Lineage() {
                     </td>
                   </tr>
                 ))}
+
+                {edges.length === 0 && !edgesQuery.isLoading && (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-sm text-muted-foreground">
+                      No lineage edges found for the selected pair.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -303,8 +458,12 @@ export default function Lineage() {
                 <div>Parent size: {eulerQuery.data.parent.size}</div>
                 <div>Child size: {eulerQuery.data.child.size}</div>
                 <div>Overlap: {eulerQuery.data.overlap.count}</div>
-                <div>Parent coverage: {formatNumber(eulerQuery.data.overlap.parentCoverage)}</div>
-                <div>Child coverage: {formatNumber(eulerQuery.data.overlap.childCoverage)}</div>
+                <div>
+                  Parent coverage: {formatNumber(eulerQuery.data.overlap.parentCoverage)}
+                </div>
+                <div>
+                  Child coverage: {formatNumber(eulerQuery.data.overlap.childCoverage)}
+                </div>
                 <div>Jaccard: {formatNumber(eulerQuery.data.overlap.jaccard)}</div>
               </dl>
             </div>

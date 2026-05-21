@@ -361,48 +361,48 @@ export const clusteringKeys = {
 
 export function getClusteringRuns(params: RunsParams = {}) {
   return fetchJson<PaginatedResponse<RunSummary>>(
-    `/v1/clustering/runs${buildQuery(params)}`
+    `/v1/clustering/runs${buildQuery(params)}`,
   );
 }
 
 export function getClusters(params: ClustersParams = {}) {
   return fetchJson<PaginatedResponse<ClusterDetail>>(
-    `/v1/clustering/clusters${buildQuery(params)}`
+    `/v1/clustering/clusters${buildQuery(params)}`,
   );
 }
 
 export function getClusterDetail(clusterId: number, params: ClusterDetailParams = {}) {
   return fetchJson<ClusterDetail>(
-    `/v1/clustering/clusters/${clusterId}${buildQuery(params)}`
+    `/v1/clustering/clusters/${clusterId}${buildQuery(params)}`,
   );
 }
 
 export function getLineageEdges(params: LineageEdgesParams = {}) {
   return fetchJson<PaginatedResponse<LineageEdge>>(
-    `/v1/clustering/lineage/edges${buildQuery(params)}`
+    `/v1/clustering/lineage/edges${buildQuery(params)}`,
   );
 }
 
 export function getSankeyView(params: SankeyParams) {
   return fetchJson<SankeyResponse>(
-    `/v1/clustering/views/sankey${buildQuery(params)}`
+    `/v1/clustering/views/sankey${buildQuery(params)}`,
   );
 }
 
 export function getGraphView(params: GraphParams) {
   return fetchJson<GraphResponse>(
-    `/v1/clustering/views/graph${buildQuery(params)}`
+    `/v1/clustering/views/graph${buildQuery(params)}`,
   );
 }
 
 export function getEulerPairDetail(edgeId: number) {
   return fetchJson<EulerPairDetail>(
-    `/v1/clustering/views/euler/pair/${edgeId}`
+    `/v1/clustering/views/euler/pair/${edgeId}`,
   );
 }
 
 export function getPipelineRuns(params: PipelineRunsParams = {}) {
   return fetchJson<PaginatedResponse<PipelineRun>>(
-    `/v1/clustering/pipeline/runs${buildQuery(params)}`
+    `/v1/clustering/pipeline/runs${buildQuery(params)}`,
   );
 }
