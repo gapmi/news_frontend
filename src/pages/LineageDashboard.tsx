@@ -11,6 +11,7 @@ import {
 } from "@/api/clustering";
 import LineageFlow from "@/components/charts/LineageFlow";
 import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
+import LineageSankey from "@/components/charts/LineageSankey";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -467,31 +468,37 @@ export default function LineageDashboard() {
         </section>
 
         <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-lg font-medium">Sankey</h2>
+        <h2 className="text-lg font-medium">Sankey</h2>
 
-          {sankeyQuery.isLoading && (
+        {sankeyQuery.isLoading && (
             <p className="mt-3 text-sm text-muted-foreground">Loading Sankey...</p>
-          )}
+        )}
 
-          {sankeyQuery.error && (
+        {sankeyQuery.error && (
             <p className="mt-3 text-sm text-red-600">
-              {(sankeyQuery.error as Error).message}
+            {(sankeyQuery.error as Error).message}
             </p>
-          )}
+        )}
 
-          {sankeyQuery.data && (
+        {sankeyQuery.data && (
             <>
-              <div className="mt-3 text-sm text-muted-foreground">
+            <div className="mt-3 text-sm text-muted-foreground">
                 Nodes: {sankeyQuery.data.stats?.nodeCount ?? "—"} · Links:{" "}
                 {sankeyQuery.data.stats?.linkCount ?? "—"} · Runs:{" "}
                 {sankeyQuery.data.stats?.runCount ?? "—"}
-              </div>
+            </div>
 
-              <pre className="mt-4 max-h-[420px] overflow-auto rounded-md bg-muted p-3 text-xs">
-                {JSON.stringify(sankeyQuery.data, null, 2)}
-              </pre>
+            <div className="mt-4">
+                <LineageSankey data={sankeyQuery.data} />
+            </div>
             </>
-          )}
+        )}
+
+        {!sankeyQuery.isLoading && !sankeyQuery.error && !sankeyQuery.data && (
+            <p className="mt-3 text-sm text-muted-foreground">
+            No Sankey data for this pair and score threshold.
+            </p>
+        )}
         </section>
 
         <section className="mb-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
