@@ -42,8 +42,11 @@ const SVG_HEIGHT = 760;
 
 const PADDING_TOP = 84;
 const PADDING_BOTTOM = 52;
-const PADDING_LEFT = 48;
-const PADDING_RIGHT = 48;
+
+const NODE_WIDTH = 160;
+const COLUMN_GAP = 220;
+const PADDING_LEFT = 72;
+const PADDING_RIGHT = 72;
 
 const COLUMN_NODE_WIDTH = 136;
 const NODE_GAP = 14;
@@ -81,10 +84,8 @@ function ellipsize(value: string, max = 20) {
   return `${value.slice(0, max - 1)}…`;
 }
 
-function getColumnX(columnIndex: number, columnCount: number) {
-  const innerWidth = SVG_WIDTH - PADDING_LEFT - PADDING_RIGHT - COLUMN_NODE_WIDTH;
-  const gap = columnCount > 1 ? innerWidth / (columnCount - 1) : 0;
-  return PADDING_LEFT + columnIndex * gap;
+function getColumnX(columnIndex: number) {
+  return PADDING_LEFT + columnIndex * (COLUMN_NODE_WIDTH + COLUMN_GAP);
 }
 
 function buildLinkPath(sourceNode: LayoutNode, targetNode: LayoutNode) {
@@ -121,6 +122,7 @@ export default function MultiRunSankey({
   } = useMemo(() => {
     const nodes = data.nodes ?? [];
     const links = data.links ?? [];
+       
 
     const grouped = new Map<number, SankeyNode[]>();
     for (const node of nodes) {
@@ -275,7 +277,7 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
     const layoutNodes: LayoutNode[] = [];
 
     for (const column of preparedColumns) {
-      const x = getColumnX(column.columnIndex, preparedColumns.length);
+      const x = getColumnX(column.columnIndex);
 
       const heights = column.nodes.map((node) =>
         clamp(
@@ -354,6 +356,11 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
       </div>
     );
   }
+  const svgWidth =
+    PADDING_LEFT +
+    PADDING_RIGHT +
+    columns.length * COLUMN_NODE_WIDTH +
+    Math.max(0, columns.length - 1) * COLUMN_GAP;
 
   return (
     <section>
@@ -380,11 +387,10 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
 
       <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
-          viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-          className="h-[760px] w-full min-w-[1180px]"
-          role="img"
-          aria-label={`Multi-run lineage from run ${minRunId ?? "unknown"} to run ${maxRunId ?? "unknown"}`}
-        >
+            viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
+            className="h-[760px]"
+            style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
+            >
           <defs>
             <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
               <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0.55" />
@@ -396,7 +402,7 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
           {columns.map((column) => (
             <g key={`col-${column.depth}`}>
               <text
-                x={getColumnX(column.columnIndex, columns.length) + COLUMN_NODE_WIDTH / 2}
+                x={getColumnX(column.columnIndex) + COLUMN_NODE_WIDTH / 2}
                 y={42}
                 textAnchor="middle"
                 fontSize="14"
