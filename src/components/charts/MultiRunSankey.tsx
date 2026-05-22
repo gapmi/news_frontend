@@ -26,18 +26,23 @@ type LayoutLink = SankeyLink & {
   edgeId: number | null;
 };
 
-const SVG_WIDTH = 1400;
-const SVG_HEIGHT = 760;
-const PADDING_TOP = 84;
-const PADDING_LEFT = 56;
-const PADDING_RIGHT = 56;
-const COLUMN_NODE_WIDTH = 132;
-const COLUMN_GAP_MIN = 86;
-const NODE_GAP = 14;
-const MIN_NODE_HEIGHT = 22;
-const MAX_NODE_HEIGHT = 92;
+const SVG_WIDTH = 1500;
+const SVG_HEIGHT = 860;
+
+const PADDING_TOP = 110;
+const PADDING_BOTTOM = 72;
+const PADDING_LEFT = 96;
+const PADDING_RIGHT = 96;
+
+const COLUMN_NODE_WIDTH = 150;
+const COLUMN_GAP_MIN = 130;
+
+const NODE_GAP = 16;
+const MIN_NODE_HEIGHT = 24;
+const MAX_NODE_HEIGHT = 84;
+
 const MIN_STROKE = 2;
-const MAX_STROKE = 20;
+const MAX_STROKE = 18;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -59,17 +64,16 @@ function getNodeLabel(node: SankeyNode) {
   return `C${node.clusterId}`;
 }
 
-function ellipsize(value: string, max = 24) {
+function ellipsize(value: string, max = 26) {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1)}…`;
 }
 
 function getColumnX(columnIndex: number, columnCount: number) {
-  const innerWidth = SVG_WIDTH - PADDING_LEFT - PADDING_RIGHT - COLUMN_NODE_WIDTH;
-  const gap =
-    columnCount > 1
-      ? Math.max(COLUMN_GAP_MIN, innerWidth / (columnCount - 1))
-      : 0;
+  const usableWidth = SVG_WIDTH - PADDING_LEFT - PADDING_RIGHT - COLUMN_NODE_WIDTH;
+  const computedGap =
+    columnCount > 1 ? usableWidth / (columnCount - 1) : 0;
+  const gap = Math.max(COLUMN_GAP_MIN, computedGap);
 
   return PADDING_LEFT + columnIndex * gap;
 }
@@ -80,7 +84,7 @@ function buildLinkPath(sourceNode: LayoutNode, targetNode: LayoutNode) {
   const x2 = targetNode.x;
   const y2 = targetNode.y + targetNode.height / 2;
   const dx = x2 - x1;
-  const curve = Math.max(40, dx * 0.42);
+  const curve = Math.max(60, dx * 0.42);
 
   return `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`;
 }
@@ -168,14 +172,27 @@ export default function MultiRunSankey({
 
     for (const column of columns) {
       const x = getColumnX(column.columnIndex, columns.length);
-      let currentY = PADDING_TOP;
 
-      for (const node of column.nodes) {
-        const height = clamp(
+      const measuredHeights = column.nodes.map((node) =>
+        clamp(
           (node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT,
           MIN_NODE_HEIGHT,
           MAX_NODE_HEIGHT,
-        );
+        ),
+      );
+
+      const totalColumnHeight =
+        measuredHeights.reduce((sum, height) => sum + height, 0) +
+        Math.max(0, column.nodes.length - 1) * NODE_GAP;
+
+      const availableHeight = SVG_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
+      const topOffset = PADDING_TOP + Math.max(0, (availableHeight - totalColumnHeight) / 2);
+
+      let currentY = topOffset;
+
+      for (let index = 0; index < column.nodes.length; index += 1) {
+        const node = column.nodes[index];
+        const height = measuredHeights[index];
 
         layoutNodes.push({
           ...node,
@@ -266,19 +283,25 @@ export default function MultiRunSankey({
       <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
           viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-          className="h-[760px] w-full min-w-[1200px]"
+          className="h-[860px] w-full min-w-[1320px]"
           role="img"
           aria-label={`Multi-run lineage from run ${minRunId ?? "unknown"} to run ${maxRunId ?? "unknown"}`}
         >
           <defs>
             <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.42" />
-              <stop offset="50%" stopColor="#9ca3af" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.42" />
+              <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0.52" />
+              <stop offset="50%" stopColor="#94a3b8" stopOpacity="0.36" />
+              <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.52" />
             </linearGradient>
 
             <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="1" stdDeviation="1.8" floodColor="#0f172a" floodOpacity="0.08" />
+              <feDropShadow
+                dx="0"
+                dy="1"
+                stdDeviation="1.8"
+                floodColor="#0f172a"
+                floodOpacity="0.08"
+              />
             </filter>
           </defs>
 
@@ -289,9 +312,9 @@ export default function MultiRunSankey({
               <g key={`col-${column.depth}`}>
                 <text
                   x={getColumnX(column.columnIndex, columns.length) + COLUMN_NODE_WIDTH / 2}
-                  y={40}
+                  y={52}
                   textAnchor="middle"
-                  fontSize="14"
+                  fontSize="15"
                   fontWeight="600"
                   fill="#52525b"
                 >
@@ -314,7 +337,7 @@ export default function MultiRunSankey({
                 fill="none"
                 stroke="url(#sankey-band-gradient)"
                 strokeWidth={link.strokeWidth}
-                strokeOpacity={isSelected ? 0.95 : 0.52}
+                strokeOpacity={isSelected ? 0.95 : 0.48}
                 strokeLinecap="round"
                 className="cursor-pointer transition-opacity"
                 onClick={() => {
@@ -335,7 +358,7 @@ Similarity: ${formatNumber(link.similarity, 3)}`}
 
           {layoutNodes.map((node) => {
             const label = getNodeLabel(node);
-            const shortLabel = ellipsize(label, 22);
+            const shortLabel = ellipsize(label, 28);
             const hasSelectedConnection =
               selectedEdgeId !== null &&
               layoutLinks.some(
@@ -351,14 +374,14 @@ Similarity: ${formatNumber(link.similarity, 3)}`}
                   y={node.y}
                   width={node.width}
                   height={node.height}
-                  rx={10}
+                  rx={12}
                   fill={hasSelectedConnection ? "#e2e8f0" : "#f3f4f6"}
                   stroke={hasSelectedConnection ? "#94a3b8" : "#d1d5db"}
                 />
 
                 <text
-                  x={node.x + 10}
-                  y={node.y + 20}
+                  x={node.x + 12}
+                  y={node.y + 22}
                   fontSize="12.5"
                   fontWeight="600"
                   fill="#111827"
@@ -366,19 +389,19 @@ Similarity: ${formatNumber(link.similarity, 3)}`}
                   {shortLabel}
                 </text>
 
-                {node.height >= 42 && (
+                {node.height >= 44 && (
                   <>
                     <text
-                      x={node.x + 10}
-                      y={node.y + 37}
+                      x={node.x + 12}
+                      y={node.y + 40}
                       fontSize="10.5"
                       fill="#475569"
                     >
                       {`C${node.clusterId} · size ${node.size}`}
                     </text>
                     <text
-                      x={node.x + 10}
-                      y={node.y + 51}
+                      x={node.x + 12}
+                      y={node.y + 55}
                       fontSize="10.5"
                       fill="#64748b"
                     >
@@ -401,7 +424,7 @@ Outbound ${formatNumber(node.outbound, 0)}`}
 
           <text
             x={PADDING_LEFT}
-            y={SVG_HEIGHT - 18}
+            y={SVG_HEIGHT - 24}
             fontSize="12"
             fill="#6b7280"
           >
