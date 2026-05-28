@@ -200,6 +200,30 @@ export default function LineageDashboard() {
         )}.`
       : "Track how a storyline flows through adjacent lineage runs and inspect overlap on demand.";
 
+
+    const clusterLabelByRef = useMemo(() => {
+        const map = new Map<string, string>();
+
+        for (const node of graphQuery.data?.nodes ?? []) {
+            const label =
+            (typeof node.meta?.nameShort === "string" && node.meta.nameShort.trim()) ||
+            (typeof node.label === "string" && node.label.trim()) ||
+            "";
+
+            map.set(`${node.runId}:${node.clusterId}`, label);
+        }
+
+        return map;
+        }, [graphQuery.data]);
+
+        function getClusterTag(runId: number, clusterId: number) {
+            return clusterLabelByRef.get(`${runId}:${clusterId}`) ?? "";
+            }
+
+            function formatClusterTitle(clusterId: number, tag: string) {
+            return tag ? `C${clusterId} · ${tag}` : `C${clusterId}`;
+            }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto max-w-[1600px] px-4 py-6">
@@ -336,18 +360,28 @@ export default function LineageDashboard() {
                               onClick={() => setSelectedEdgeId(edge.edgeId)}
                             >
                               <td className="py-2 pr-4">{edge.edgeId}</td>
-                              <td className="py-2 pr-4">
-                                {formatClusterRef(edge.parentClusterId)}<br />
-                                <span className="text-xs text-muted-foreground">
-                                  Run {edge.parentRunId} · size {edge.parentSize}
-                                </span>
-                              </td>
-                              <td className="py-2 pr-4">
-                                {formatClusterRef(edge.childClusterId)}<br />
-                                <span className="text-xs text-muted-foreground">
-                                  Run {edge.childRunId} · size {edge.childSize}
-                                </span>
-                              </td>
+                                <td className="py-2 pr-4">
+                                <div className="font-medium">
+                                    {formatClusterTitle(
+                                    edge.parentClusterId,
+                                    getClusterTag(edge.parentRunId, edge.parentClusterId),
+                                    )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Run {edge.parentRunId} · size {edge.parentSize}
+                                </div>
+                                </td>
+                                <td className="py-2 pr-4">
+                                <div className="font-medium">
+                                    {formatClusterTitle(
+                                    edge.childClusterId,
+                                    getClusterTag(edge.childRunId, edge.childClusterId),
+                                    )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Run {edge.childRunId} · size {edge.childSize}
+                                </div>
+                                </td>
                               <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
                               <td className="py-2 pr-4">
                                 {formatNumber(edge.centroidSimilarity)}
