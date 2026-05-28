@@ -221,7 +221,7 @@ export default function LineageDashboard() {
             }
 
             function formatClusterTitle(clusterId: number, tag: string) {
-            return tag ? `C${clusterId} · ${tag}` : `C${clusterId}`;
+            return tag ? `${tag} · C${clusterId}` : `C${clusterId}`;
             }
 
   return (
@@ -360,28 +360,28 @@ export default function LineageDashboard() {
                               onClick={() => setSelectedEdgeId(edge.edgeId)}
                             >
                               <td className="py-2 pr-4">{edge.edgeId}</td>
-                                <td className="py-2 pr-4">
-                                <div className="font-medium">
-                                    {formatClusterTitle(
-                                    edge.parentClusterId,
-                                    getClusterTag(edge.parentRunId, edge.parentClusterId),
-                                    )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Run {edge.parentRunId} · size {edge.parentSize}
-                                </div>
-                                </td>
-                                <td className="py-2 pr-4">
-                                <div className="font-medium">
-                                    {formatClusterTitle(
-                                    edge.childClusterId,
-                                    getClusterTag(edge.childRunId, edge.childClusterId),
-                                    )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Run {edge.childRunId} · size {edge.childSize}
-                                </div>
-                                </td>
+                            <td className="py-2 pr-4">
+                            <div className="font-medium">
+                                {formatClusterTitle(
+                                edge.parentClusterId,
+                                getClusterTag(edge.parentRunId, edge.parentClusterId),
+                                )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Run {edge.parentRunId} · size {edge.parentSize}
+                            </div>
+                            </td>
+                            <td className="py-2 pr-4">
+                            <div className="font-medium">
+                                {formatClusterTitle(
+                                edge.childClusterId,
+                                getClusterTag(edge.childRunId, edge.childClusterId),
+                                )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Run {edge.childRunId} · size {edge.childSize}
+                            </div>
+                            </td>
                               <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
                               <td className="py-2 pr-4">
                                 {formatNumber(edge.centroidSimilarity)}
