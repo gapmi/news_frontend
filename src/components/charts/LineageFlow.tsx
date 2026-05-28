@@ -91,6 +91,9 @@ function GraphCanvas({ data, selectedEdgeId, onSelectEdge }: Props) {
       },
     }));
 
+    console.log("GRAPH NODES", data?.nodes?.slice(0, 5));
+console.log("GRAPH EDGES", data?.edges?.slice(0, 5));
+
     return { nodes: graphNodes, edges: graphEdges };
   }, [data, selectedEdgeId]);
 
@@ -104,6 +107,9 @@ function GraphCanvas({ data, selectedEdgeId, onSelectEdge }: Props) {
 
   return (
     <div className="h-[640px] w-full overflow-hidden rounded-xl border bg-background">
+      <div className="mb-2 text-xs text-muted-foreground">
+  nodes: {nodes.length} · edges: {edges.length}
+</div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
