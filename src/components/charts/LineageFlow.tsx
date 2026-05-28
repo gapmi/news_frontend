@@ -34,40 +34,61 @@ function clusterLabel(node: GraphNode) {
 
 function GraphCanvas({ data, selectedEdgeId, onSelectEdge }: Props) {
   const { nodes, edges } = useMemo(() => {
-    const graphNodes: Node[] = (data?.nodes ?? []).map((node: GraphNode) => {
-      const pos = node.positionHint ?? { x: 0, y: 0 };
+const sourceNodes = data?.nodes ?? [];
 
-      const isConnectedToSelected =
-        selectedEdgeId !== null &&
-        (data?.edges ?? []).some(
-          (edge) =>
-            edge.edgeId === selectedEdgeId &&
-            (edge.source === node.id || edge.target === node.id),
-        );
+const runOrder = Array.from(
+  new Set(sourceNodes.map((node) => node.runId)),
+).sort((a, b) => a - b);
 
-      return {
-        id: node.id,
-        position: {
-          x: Number.isFinite(pos.x) ? pos.x * 220 : 0,
-          y: Number.isFinite(pos.y) ? pos.y * 120 : 0,
-        },
-        data: {
-          label: `${clusterLabel(node)}\nRun ${node.runId} · C${node.clusterId} · size ${node.size}`,
-          edgeId: node.clusterId,
-        },
-        style: {
-          borderRadius: 16,
-          padding: 12,
-          width: 190,
-          border: isConnectedToSelected ? "2px solid #0f172a" : "1px solid #cbd5e1",
-          background: isConnectedToSelected ? "#e2e8f0" : "#ffffff",
-          fontSize: 12,
-          lineHeight: 1.35,
-          whiteSpace: "pre-line",
-          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
-        },
-      };
-    });
+const runIndex = new Map(runOrder.map((runId, index) => [runId, index]));
+
+const nodesByRun = new Map<number, GraphNode[]>();
+for (const node of sourceNodes) {
+  const bucket = nodesByRun.get(node.runId) ?? [];
+  bucket.push(node);
+  nodesByRun.set(node.runId, bucket);
+}
+
+for (const bucket of nodesByRun.values()) {
+  bucket.sort((a, b) => a.clusterId - b.clusterId);
+}
+
+const graphNodes: Node[] = sourceNodes.map((node: GraphNode) => {
+  const col = runIndex.get(node.runId) ?? 0;
+  const row = (nodesByRun.get(node.runId) ?? []).findIndex(
+    (item) => item.id === node.id,
+  );
+
+  const isConnectedToSelected =
+    selectedEdgeId !== null &&
+    (data?.edges ?? []).some(
+      (edge) =>
+        edge.edgeId === selectedEdgeId &&
+        (edge.source === node.id || edge.target === node.id),
+    );
+
+  return {
+    id: node.id,
+    position: {
+      x: col * 260,
+      y: row * 110,
+    },
+    data: {
+      label: `${clusterLabel(node)}\nRun ${node.runId} · C${node.clusterId} · size ${node.size}`,
+    },
+    style: {
+      borderRadius: 16,
+      padding: 12,
+      width: 190,
+      border: isConnectedToSelected ? "2px solid #0f172a" : "1px solid #cbd5e1",
+      background: isConnectedToSelected ? "#e2e8f0" : "#ffffff",
+      fontSize: 12,
+      lineHeight: 1.35,
+      whiteSpace: "pre-line",
+      boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+    },
+  };
+});
 
     const graphEdges: Edge[] = (data?.edges ?? []).map((edge: GraphEdge) => ({
       id: edge.id,
