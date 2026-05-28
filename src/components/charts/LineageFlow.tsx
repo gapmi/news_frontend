@@ -1,259 +1,142 @@
 import { useMemo } from "react";
-import type { LineageEdge } from "@/api/clustering";
+import {
+  Background,
+  Controls,
+  MiniMap,
+  MarkerType,
+  ReactFlow,
+  ReactFlowProvider,
+  type Edge,
+  type Node,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import type { GraphEdge, GraphNode, GraphResponse } from "@/api/clustering";
 
 type Props = {
-  edges: LineageEdge[];
-  parentRunId: number | null;
-  childRunId: number | null;
+  data: GraphResponse | null;
   selectedEdgeId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
-};
-
-type FlowNode = {
-  id: string;
-  clusterId: number;
-  side: "parent" | "child";
-  total: number;
-  count: number;
-  y: number;
-  h: number;
 };
 
 function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
+function clusterLabel(node: GraphNode) {
+  if (node.meta?.nameShort && String(node.meta.nameShort).trim().length > 0) {
+    return String(node.meta.nameShort);
+  }
+  if (node.label && node.label.trim().length > 0) {
+    return node.label;
+  }
+  return `C${node.clusterId}`;
 }
 
-export default function LineageFlow({
-  edges,
-  parentRunId,
-  childRunId,
-  selectedEdgeId = null,
-  onSelectEdge,
-}: Props) {
-  const topEdges = useMemo(() => {
-    return [...edges]
-      .sort((a, b) => {
-        if (b.articleOverlapCount !== a.articleOverlapCount) {
-          return b.articleOverlapCount - a.articleOverlapCount;
-        }
-        return b.score - a.score;
-      })
-      .slice(0, 14);
-  }, [edges]);
+function GraphCanvas({ data, selectedEdgeId, onSelectEdge }: Props) {
+  const { nodes, edges } = useMemo(() => {
+    const graphNodes: Node[] = (data?.nodes ?? []).map((node: GraphNode) => {
+      const pos = node.positionHint ?? { x: 0, y: 0 };
 
-  const {
-    parentNodes,
-    childNodes,
-    parentMap,
-    childMap,
-    maxOverlap,
-  } = useMemo(() => {
-    const parentAgg = new Map<number, { total: number; count: number }>();
-    const childAgg = new Map<number, { total: number; count: number }>();
+      const isConnectedToSelected =
+        selectedEdgeId !== null &&
+        (data?.edges ?? []).some(
+          (edge) =>
+            edge.edgeId === selectedEdgeId &&
+            (edge.source === node.id || edge.target === node.id),
+        );
 
-    for (const edge of topEdges) {
-      const parentCurrent = parentAgg.get(edge.parentClusterId) ?? { total: 0, count: 0 };
-      parentCurrent.total += edge.articleOverlapCount;
-      parentCurrent.count += 1;
-      parentAgg.set(edge.parentClusterId, parentCurrent);
+      return {
+        id: node.id,
+        position: {
+          x: Number.isFinite(pos.x) ? pos.x * 220 : 0,
+          y: Number.isFinite(pos.y) ? pos.y * 120 : 0,
+        },
+        data: {
+          label: `${clusterLabel(node)}\nRun ${node.runId} · C${node.clusterId} · size ${node.size}`,
+          edgeId: node.clusterId,
+        },
+        style: {
+          borderRadius: 16,
+          padding: 12,
+          width: 190,
+          border: isConnectedToSelected ? "2px solid #0f172a" : "1px solid #cbd5e1",
+          background: isConnectedToSelected ? "#e2e8f0" : "#ffffff",
+          fontSize: 12,
+          lineHeight: 1.35,
+          whiteSpace: "pre-line",
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+        },
+      };
+    });
 
-      const childCurrent = childAgg.get(edge.childClusterId) ?? { total: 0, count: 0 };
-      childCurrent.total += edge.articleOverlapCount;
-      childCurrent.count += 1;
-      childAgg.set(edge.childClusterId, childCurrent);
-    }
+    const graphEdges: Edge[] = (data?.edges ?? []).map((edge: GraphEdge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
+      animated: selectedEdgeId === edge.edgeId,
+      style: {
+        stroke: selectedEdgeId === edge.edgeId ? "#0f172a" : "#94a3b8",
+        strokeWidth:
+          selectedEdgeId === edge.edgeId
+            ? 3.5
+            : Math.max(1.5, Math.min(6, edge.overlapCount / 4)),
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: selectedEdgeId === edge.edgeId ? "#0f172a" : "#94a3b8",
+      },
+      data: {
+        edgeId: edge.edgeId,
+      },
+    }));
 
-    const parentSorted = [...parentAgg.entries()]
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([clusterId, value]) => ({ clusterId, ...value }));
+    return { nodes: graphNodes, edges: graphEdges };
+  }, [data, selectedEdgeId]);
 
-    const childSorted = [...childAgg.entries()]
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([clusterId, value]) => ({ clusterId, ...value }));
-
-    const layout = (
-      items: Array<{ clusterId: number; total: number; count: number }>,
-      side: "parent" | "child",
-    ) => {
-      const top = 28;
-      const gap = 14;
-      const minH = 34;
-      const maxH = 74;
-      const maxTotal = Math.max(...items.map((item) => item.total), 1);
-
-      return items.map((item, index) => {
-        const h = clamp((item.total / maxTotal) * maxH, minH, maxH);
-        const y =
-          top +
-          items
-            .slice(0, index)
-            .reduce((sum, current) => {
-              const currentH = clamp((current.total / maxTotal) * maxH, minH, maxH);
-              return sum + currentH + gap;
-            }, 0);
-
-        return {
-          id: `${side}-${item.clusterId}`,
-          clusterId: item.clusterId,
-          side,
-          total: item.total,
-          count: item.count,
-          y,
-          h,
-        } satisfies FlowNode;
-      });
-    };
-
-    const parentNodes = layout(parentSorted, "parent");
-    const childNodes = layout(childSorted, "child");
-
-    const parentMap = new Map(parentNodes.map((node) => [node.clusterId, node]));
-    const childMap = new Map(childNodes.map((node) => [node.clusterId, node]));
-
-    return {
-      parentNodes,
-      childNodes,
-      parentMap,
-      childMap,
-      maxOverlap: Math.max(...topEdges.map((edge) => edge.articleOverlapCount), 1),
-    };
-  }, [topEdges]);
-
-  if (!parentRunId || !childRunId) {
-    return null;
+  if (!data || data.nodes.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed p-8 text-sm text-muted-foreground">
+        No graph data available for this run window.
+      </div>
+    );
   }
 
   return (
-    <section className="mb-6">
-      <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <div className="mb-3">
-          <h2 className="text-lg font-medium">Cluster flow</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pair {parentRunId} → {childRunId}, top lineage links by overlap.
-          </p>
-        </div>
+    <div className="h-[640px] w-full overflow-hidden rounded-xl border bg-background">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        fitView
+        fitViewOptions={{ padding: 0.18 }}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        onEdgeClick={(_, edge) => {
+          const edgeId = edge.data?.edgeId;
+          if (typeof edgeId === "number") onSelectEdge?.(edgeId);
+        }}
+      >
+        <Background gap={24} size={1} />
+        <MiniMap pannable zoomable />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </div>
+  );
+}
 
-        {topEdges.length === 0 ? (
-          <div className="rounded-md border border-dashed p-8 text-sm text-muted-foreground">
-            No flow data for this pair.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <svg
-              viewBox="0 0 1100 560"
-              className="h-[560px] w-full min-w-[900px]"
-              role="img"
-              aria-label={`Cluster flow for run ${parentRunId} to run ${childRunId}`}
-            >
-              <defs>
-                <linearGradient id="flowGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.55" />
-                  <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.55" />
-                </linearGradient>
-              </defs>
-
-              <text x="110" y="24" fontSize="14" fill="currentColor" opacity="0.7">
-                Parent run {parentRunId}
-              </text>
-              <text x="860" y="24" fontSize="14" fill="currentColor" opacity="0.7">
-                Child run {childRunId}
-              </text>
-
-              {topEdges.map((edge) => {
-                const parentNode = parentMap.get(edge.parentClusterId);
-                const childNode = childMap.get(edge.childClusterId);
-
-                if (!parentNode || !childNode) {
-                  return null;
-                }
-
-                const startX = 250;
-                const endX = 850;
-                const startY = parentNode.y + parentNode.h / 2;
-                const endY = childNode.y + childNode.h / 2;
-                const curve = 220;
-                const strokeWidth = clamp(
-                  (edge.articleOverlapCount / maxOverlap) * 18,
-                  2,
-                  18,
-                );
-                const isSelected = selectedEdgeId === edge.edgeId;
-
-                const d = `M ${startX} ${startY}
-                  C ${startX + curve} ${startY},
-                    ${endX - curve} ${endY},
-                    ${endX} ${endY}`;
-
-                return (
-                  <path
-                    key={edge.edgeId}
-                    d={d}
-                    fill="none"
-                    stroke="url(#flowGradient)"
-                    strokeWidth={strokeWidth}
-                    strokeOpacity={isSelected ? 0.95 : 0.42}
-                    strokeLinecap="round"
-                    className="cursor-pointer transition-opacity"
-                    onClick={() => onSelectEdge?.(edge.edgeId)}
-                  >
-                    <title>
-                      {`Edge #${edge.edgeId}: P${edge.parentClusterId} → C${edge.childClusterId} · overlap ${edge.articleOverlapCount} · score ${formatNumber(edge.score, 3)} · similarity ${formatNumber(edge.centroidSimilarity, 3)}`}
-                    </title>
-                  </path>
-                );
-              })}
-
-              {parentNodes.map((node) => (
-                <g key={node.id}>
-                  <rect
-                    x={80}
-                    y={node.y}
-                    width={170}
-                    height={node.h}
-                    rx={10}
-                    fill="#dbeafe"
-                    stroke="#93c5fd"
-                  />
-                  <text x={94} y={node.y + 18} fontSize="13" fontWeight="600" fill="#1e3a8a">
-                    {`P${node.clusterId}`}
-                  </text>
-                  <text x={94} y={node.y + 36} fontSize="11" fill="#1e40af">
-                    {`overlap ${node.total} · edges ${node.count}`}
-                  </text>
-                </g>
-              ))}
-
-              {childNodes.map((node) => (
-                <g key={node.id}>
-                  <rect
-                    x={850}
-                    y={node.y}
-                    width={170}
-                    height={node.h}
-                    rx={10}
-                    fill="#ede9fe"
-                    stroke="#c4b5fd"
-                  />
-                  <text x={864} y={node.y + 18} fontSize="13" fontWeight="600" fill="#5b21b6">
-                    {`C${node.clusterId}`}
-                  </text>
-                  <text x={864} y={node.y + 36} fontSize="11" fill="#6d28d9">
-                    {`overlap ${node.total} · edges ${node.count}`}
-                  </text>
-                </g>
-              ))}
-            </svg>
-          </div>
-        )}
-
-        <div className="mt-3 text-xs text-muted-foreground">
-          Thicker links mean more overlapping articles. Click a link to open Euler detail.
-        </div>
+export default function LineageFlow(props: Props) {
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-3">
+        <h2 className="text-lg font-medium">Cluster graph</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Click an edge to sync selection with the lineage table and Euler detail.
+        </p>
       </div>
+
+      <ReactFlowProvider>
+        <GraphCanvas {...props} />
+      </ReactFlowProvider>
     </section>
   );
 }

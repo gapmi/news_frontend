@@ -293,19 +293,12 @@ export default function LineageDashboard() {
                 />
                 )}
 
-                {viewMode === "graph" && (
-                <div className="rounded-md border border-dashed p-8 text-sm text-muted-foreground">
-                    {graphQuery.isLoading && "Loading graph…"}
-                    {graphQuery.error && (graphQuery.error as Error).message}
-                    {!graphQuery.isLoading && !graphQuery.error && graphQuery.data && (
-                    <div className="space-y-2">
-                        <div>Graph data loaded.</div>
-                        <div>Nodes: {graphQuery.data.stats.nodeCount}</div>
-                        <div>Edges: {graphQuery.data.stats.edgeCount}</div>
-                        <div>Groups: {graphQuery.data.groups.length}</div>
-                    </div>
-                    )}
-                </div>
+                {viewMode === "graph" && graphQuery.data && (
+                <LineageFlow
+                    data={graphQuery.data}
+                    selectedEdgeId={selectedEdgeId}
+                    onSelectEdge={setSelectedEdgeId}
+                />
                 )}
               </section>
 
@@ -378,13 +371,6 @@ export default function LineageDashboard() {
                   </div>
                 </div>
 
-                <LineageFlow
-                  edges={edges}
-                  parentRunId={parentRunId}
-                  childRunId={childRunId}
-                  selectedEdgeId={selectedEdgeId}
-                  onSelectEdge={setSelectedEdgeId}
-                />
               </section>
 
               <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
