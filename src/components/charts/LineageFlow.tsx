@@ -91,8 +91,6 @@ function GraphCanvas({ data, selectedEdgeId, onSelectEdge }: Props) {
       },
     }));
 
-    console.log("GRAPH NODES", data?.nodes?.slice(0, 5));
-console.log("GRAPH EDGES", data?.edges?.slice(0, 5));
 
     return { nodes: graphNodes, edges: graphEdges };
   }, [data, selectedEdgeId]);
@@ -131,6 +129,9 @@ console.log("GRAPH EDGES", data?.edges?.slice(0, 5));
 }
 
 export default function LineageFlow(props: Props) {
+    
+    console.log("GRAPH NODES", props.data?.nodes?.slice(0, 5));
+    console.log("GRAPH EDGES", props.data?.edges?.slice(0, 5));
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3">
