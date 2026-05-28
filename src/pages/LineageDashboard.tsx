@@ -4,8 +4,11 @@ import {
   clusteringKeys,
   getClusteringRuns,
   getEulerPairDetail,
+  getGraphView,
   getLineageEdges,
   getPipelineRuns,
+  getSankeyView,
+  type LineageEdge,
 } from "@/api/clustering";
 import StoryHeaderCard from "@/components/lineage/StoryHeaderCard";
 import RunTimelineSlider from "@/components/lineage/RunTimelineSlider";
@@ -14,7 +17,6 @@ import EulerDetailModal from "@/components/lineage/EulerDetailModal";
 import MultiRunSankey from "@/components/charts/MultiRunSankey";
 import LineageFlow from "@/components/charts/LineageFlow";
 import { getLineageWindow } from "@/utils/lineageWindow";
-import { getSankeyView, type LineageEdge } from "@/api/clustering";
 
 interface RunPair {
   parentRunId: number;
@@ -40,6 +42,8 @@ export default function LineageDashboard() {
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
+
+  const [viewMode, setViewMode] = useState<"sankey" | "graph">("graph");
 
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 20 }),
@@ -117,6 +121,16 @@ export default function LineageDashboard() {
       }
     : null;
 
+  const graphParams = sankeyWindow
+    ? {
+      start_run_id: sankeyWindow.startRunId,
+      end_run_id: sankeyWindow.endRunId,
+      min_score: minScore,
+      max_nodes: 180,
+      max_edges: 220,
+     }
+    : null;
+
   const edgeParams =
     parentRunId !== null &&
     childRunId !== null &&
@@ -135,6 +149,15 @@ export default function LineageDashboard() {
       : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
     queryFn: () => getSankeyView(sankeyParams!),
     enabled: Boolean(sankeyParams),
+    placeholderData: keepPreviousData,
+  });
+
+    const graphQuery = useQuery({
+    queryKey: graphParams
+      ? clusteringKeys.graph(graphParams)
+      : clusteringKeys.graph({ start_run_id: 0, end_run_id: 0 }),
+    queryFn: () => getGraphView(graphParams!),
+    enabled: Boolean(graphParams),
     placeholderData: keepPreviousData,
   });
 
@@ -210,10 +233,28 @@ export default function LineageDashboard() {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="rounded-lg border bg-background p-1 text-xs">
-                      <span className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground">
+                    <button
+                        type="button"
+                        className={
+                        viewMode === "sankey"
+                            ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+                            : "px-3 py-1.5 text-muted-foreground"
+                        }
+                        onClick={() => setViewMode("sankey")}
+                    >
                         Sankey
-                      </span>
-                      <span className="px-3 py-1.5 text-muted-foreground">Graph</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={
+                        viewMode === "graph"
+                            ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+                            : "px-3 py-1.5 text-muted-foreground"
+                        }
+                        onClick={() => setViewMode("graph")}
+                    >
+                        Graph
+                    </button>
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
@@ -244,12 +285,27 @@ export default function LineageDashboard() {
                   </p>
                 )}
 
-                {sankeyQuery.data && (
-                  <MultiRunSankey
+                {viewMode === "sankey" && sankeyQuery.data && (
+                <MultiRunSankey
                     data={sankeyQuery.data}
                     selectedEdgeId={selectedEdgeId}
                     onSelectEdge={setSelectedEdgeId}
-                  />
+                />
+                )}
+
+                {viewMode === "graph" && (
+                <div className="rounded-md border border-dashed p-8 text-sm text-muted-foreground">
+                    {graphQuery.isLoading && "Loading graph…"}
+                    {graphQuery.error && (graphQuery.error as Error).message}
+                    {!graphQuery.isLoading && !graphQuery.error && graphQuery.data && (
+                    <div className="space-y-2">
+                        <div>Graph data loaded.</div>
+                        <div>Nodes: {graphQuery.data.stats.nodeCount}</div>
+                        <div>Edges: {graphQuery.data.stats.edgeCount}</div>
+                        <div>Groups: {graphQuery.data.groups.length}</div>
+                    </div>
+                    )}
+                </div>
                 )}
               </section>
 
