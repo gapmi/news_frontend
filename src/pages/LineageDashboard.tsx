@@ -32,23 +32,18 @@ function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
-function formatClusterRef(clusterId: number, label?: string | null) {
-  return label ? `${label} · C${clusterId}` : `Cluster ${clusterId}`;
-}
-
 export default function LineageDashboard() {
   const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
-
   const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
   const [viewMode, setViewMode] = useState<"sankey" | "graph">("graph");
   const [selectedCluster, setSelectedCluster] = useState<{
     runId: number;
     clusterId: number;
     label?: string | null;
-    } | null>(null);
+  } | null>(null);
 
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 20 }),
@@ -67,7 +62,7 @@ export default function LineageDashboard() {
 
   function handleSelectCluster(runId: number, clusterId: number, label?: string | null) {
     setSelectedCluster({ runId, clusterId, label: label ?? null });
-    }
+  }
 
   const lineageRuns = useMemo(() => {
     return runs.filter(
@@ -111,14 +106,18 @@ export default function LineageDashboard() {
       return;
     }
 
-  useEffect(() => {
-  setSelectedCluster(null);
-    }, [parentRunId, childRunId, minScore]);
-
     if (childRunId === null || !childOptions.includes(childRunId)) {
       setManualChildRunId(childOptions[0]);
     }
   }, [childOptions, childRunId]);
+
+  useEffect(() => {
+    setSelectedCluster(null);
+  }, [parentRunId, childRunId, minScore]);
+
+  useEffect(() => {
+    console.log("selectedCluster", selectedCluster);
+  }, [selectedCluster]);
 
   const sankeyWindow = useMemo(() => {
     if (parentRunId === null) return null;
@@ -137,12 +136,12 @@ export default function LineageDashboard() {
 
   const graphParams = sankeyWindow
     ? {
-      start_run_id: sankeyWindow.startRunId,
-      end_run_id: sankeyWindow.endRunId,
-      min_score: minScore,
-      max_nodes: 180,
-      max_edges: 220,
-     }
+        start_run_id: sankeyWindow.startRunId,
+        end_run_id: sankeyWindow.endRunId,
+        min_score: minScore,
+        max_nodes: 180,
+        max_edges: 220,
+      }
     : null;
 
   const edgeParams =
@@ -166,7 +165,7 @@ export default function LineageDashboard() {
     placeholderData: keepPreviousData,
   });
 
-    const graphQuery = useQuery({
+  const graphQuery = useQuery({
     queryKey: graphParams
       ? clusteringKeys.graph(graphParams)
       : clusteringKeys.graph({ start_run_id: 0, end_run_id: 0 }),
@@ -214,33 +213,28 @@ export default function LineageDashboard() {
         )}.`
       : "Track how a storyline flows through adjacent lineage runs and inspect overlap on demand.";
 
+  const clusterLabelByRef = useMemo(() => {
+    const map = new Map<string, string>();
 
-    const clusterLabelByRef = useMemo(() => {
-        const map = new Map<string, string>();
+    for (const node of graphQuery.data?.nodes ?? []) {
+      const label =
+        (typeof node.meta?.nameShort === "string" && node.meta.nameShort.trim()) ||
+        (typeof node.label === "string" && node.label.trim()) ||
+        "";
 
-        for (const node of graphQuery.data?.nodes ?? []) {
-            const label =
-            (typeof node.meta?.nameShort === "string" && node.meta.nameShort.trim()) ||
-            (typeof node.label === "string" && node.label.trim()) ||
-            "";
+      map.set(`${node.runId}:${node.clusterId}`, label);
+    }
 
-            map.set(`${node.runId}:${node.clusterId}`, label);
-        }
+    return map;
+  }, [graphQuery.data]);
 
-        return map;
-        }, [graphQuery.data]);
+  function getClusterTag(runId: number, clusterId: number) {
+    return clusterLabelByRef.get(`${runId}:${clusterId}`) ?? "";
+  }
 
-        function getClusterTag(runId: number, clusterId: number) {
-            return clusterLabelByRef.get(`${runId}:${clusterId}`) ?? "";
-            }
-
-            function formatClusterTitle(clusterId: number, tag: string) {
-            return tag ? `${tag} · C${clusterId}` : `C${clusterId}`;
-            }
-
-            useEffect(() => {
-                console.log("selectedCluster", selectedCluster);
-                }, [selectedCluster]);
+  function formatClusterTitle(clusterId: number, tag: string) {
+    return tag ? `${tag} · C${clusterId}` : `C${clusterId}`;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -259,6 +253,7 @@ export default function LineageDashboard() {
               setManualParentRunId(runId);
               setManualChildRunId(nextChildOptions[0] ?? null);
               setSelectedEdgeId(null);
+              setSelectedCluster(null);
             }}
           />
 
@@ -269,34 +264,36 @@ export default function LineageDashboard() {
                   <div>
                     <h2 className="text-lg font-medium">Semantic map</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Anchor run {parentRunId ?? "—"} · Pair {parentRunId ?? "—"} → {childRunId ?? "—"} · Window {sankeyWindow?.startRunId ?? "—"} → {sankeyWindow?.endRunId ?? "—"}
+                      Anchor run {parentRunId ?? "—"} · Pair {parentRunId ?? "—"} →{" "}
+                      {childRunId ?? "—"} · Window {sankeyWindow?.startRunId ?? "—"} →{" "}
+                      {sankeyWindow?.endRunId ?? "—"}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="rounded-lg border bg-background p-1 text-xs">
-                    <button
+                      <button
                         type="button"
                         className={
-                        viewMode === "sankey"
+                          viewMode === "sankey"
                             ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
                             : "px-3 py-1.5 text-muted-foreground"
                         }
                         onClick={() => setViewMode("sankey")}
-                    >
+                      >
                         Sankey
-                    </button>
-                    <button
+                      </button>
+                      <button
                         type="button"
                         className={
-                        viewMode === "graph"
+                          viewMode === "graph"
                             ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
                             : "px-3 py-1.5 text-muted-foreground"
                         }
                         onClick={() => setViewMode("graph")}
-                    >
+                      >
                         Graph
-                    </button>
+                      </button>
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
@@ -311,6 +308,7 @@ export default function LineageDashboard() {
                         onChange={(event) => {
                           setMinScore(Number(event.target.value));
                           setSelectedEdgeId(null);
+                          setSelectedCluster(null);
                         }}
                       />
                     </label>
@@ -328,20 +326,20 @@ export default function LineageDashboard() {
                 )}
 
                 {viewMode === "sankey" && sankeyQuery.data && (
-                <MultiRunSankey
+                  <MultiRunSankey
                     data={sankeyQuery.data}
                     selectedEdgeId={selectedEdgeId}
                     onSelectEdge={setSelectedEdgeId}
-                />
+                  />
                 )}
 
                 {viewMode === "graph" && graphQuery.data && (
-                <LineageFlow
+                  <LineageFlow
                     data={graphQuery.data}
                     selectedEdgeId={selectedEdgeId}
                     onSelectEdge={setSelectedEdgeId}
                     onSelectCluster={handleSelectCluster}
-                />
+                  />
                 )}
               </section>
 
@@ -379,34 +377,35 @@ export default function LineageDashboard() {
                               onClick={() => setSelectedEdgeId(edge.edgeId)}
                             >
                               <td className="py-2 pr-4">{edge.edgeId}</td>
-                            <td className="py-2 pr-4">
-                            <div className="font-medium">
-                                {formatClusterTitle(
-                                edge.parentClusterId,
-                                getClusterTag(edge.parentRunId, edge.parentClusterId),
-                                )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Run {edge.parentRunId} · size {edge.parentSize}
-                            </div>
-                            </td>
-                            <td className="py-2 pr-4">
-                            <div className="font-medium">
-                                {formatClusterTitle(
-                                edge.childClusterId,
-                                getClusterTag(edge.childRunId, edge.childClusterId),
-                                )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Run {edge.childRunId} · size {edge.childSize}
-                            </div>
-                            </td>
+                              <td className="py-2 pr-4">
+                                <div className="font-medium">
+                                  {formatClusterTitle(
+                                    edge.parentClusterId,
+                                    getClusterTag(edge.parentRunId, edge.parentClusterId),
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Run {edge.parentRunId} · size {edge.parentSize}
+                                </div>
+                              </td>
+                              <td className="py-2 pr-4">
+                                <div className="font-medium">
+                                  {formatClusterTitle(
+                                    edge.childClusterId,
+                                    getClusterTag(edge.childRunId, edge.childClusterId),
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Run {edge.childRunId} · size {edge.childSize}
+                                </div>
+                              </td>
                               <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
                               <td className="py-2 pr-4">
                                 {formatNumber(edge.centroidSimilarity)}
                               </td>
                               <td className="py-2 pr-4">
-                                {edge.articleOverlapCount} ({formatNumber(edge.articleOverlapRatio)})
+                                {edge.articleOverlapCount} (
+                                {formatNumber(edge.articleOverlapRatio)})
                               </td>
                             </tr>
                           );
@@ -423,7 +422,6 @@ export default function LineageDashboard() {
                     </table>
                   </div>
                 </div>
-
               </section>
 
               <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
