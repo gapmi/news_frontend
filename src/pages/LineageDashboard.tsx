@@ -41,9 +41,14 @@ export default function LineageDashboard() {
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
-  const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
 
+  const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
   const [viewMode, setViewMode] = useState<"sankey" | "graph">("graph");
+  const [selectedCluster, setSelectedCluster] = useState<{
+    runId: number;
+    clusterId: number;
+    label?: string | null;
+    } | null>(null);
 
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({ status: "success", limit: 20 }),
@@ -59,6 +64,10 @@ export default function LineageDashboard() {
   const pipelineRuns = pipelineRunsQuery.data?.items ?? [];
   const latestRun = runs[0] ?? null;
   const latestPipelineRun = pipelineRuns[0] ?? null;
+
+  function handleSelectCluster(runId: number, clusterId: number, label?: string | null) {
+    setSelectedCluster({ runId, clusterId, label: label ?? null });
+    }
 
   const lineageRuns = useMemo(() => {
     return runs.filter(
@@ -101,6 +110,11 @@ export default function LineageDashboard() {
       setManualChildRunId(null);
       return;
     }
+
+  useEffect(() => {
+  setSelectedCluster(null);
+    }, [parentRunId, childRunId, minScore]);
+
     if (childRunId === null || !childOptions.includes(childRunId)) {
       setManualChildRunId(childOptions[0]);
     }
@@ -224,6 +238,10 @@ export default function LineageDashboard() {
             return tag ? `${tag} · C${clusterId}` : `C${clusterId}`;
             }
 
+            useEffect(() => {
+                console.log("selectedCluster", selectedCluster);
+                }, [selectedCluster]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto max-w-[1600px] px-4 py-6">
@@ -322,6 +340,7 @@ export default function LineageDashboard() {
                     data={graphQuery.data}
                     selectedEdgeId={selectedEdgeId}
                     onSelectEdge={setSelectedEdgeId}
+                    onSelectCluster={handleSelectCluster}
                 />
                 )}
               </section>
