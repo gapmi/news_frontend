@@ -1,61 +1,62 @@
 import TagLanguageToggle from "@/components/lineage/TagLanguageToggle";
-import GeoBreakdownCard from "@/components/lineage/GeoBreakdownCard";
-import PolarityCard from "@/components/lineage/PolarityCard";
 
 interface LineageRightPanelProps {
   tagLanguage: "RU" | "EN";
   onChangeTagLanguage: (value: "RU" | "EN") => void;
 }
 
+function RightPanelSection({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border/70 bg-background">
+      <div className="border-b border-border/60 bg-muted/20 px-4 py-3">
+        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          {eyebrow}
+        </div>
+        <h3 className="mt-2 text-sm font-semibold tracking-tight">{title}</h3>
+        {description ? (
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="px-4 py-4">{children}</div>
+    </section>
+  );
+}
+
 export default function LineageRightPanel({
   tagLanguage,
   onChangeTagLanguage,
 }: LineageRightPanelProps) {
-  const tags =
-    tagLanguage === "RU"
-      ? ["#микрочипы", "#санкции", "#тайвань", "#экспорт", "#поставки"]
-      : ["#microchips", "#sanctions", "#taiwan", "#exports", "#supplychain"];
-
   return (
-    <aside className="space-y-4">
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-medium">Tag language</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Filter visible tags to one language
-            </p>
+    <div className="space-y-4">
+      <RightPanelSection
+        eyebrow="Display"
+        title="Label settings"
+        description="Choose which tag language is used in supporting lineage UI."
+      >
+        <div className="flex flex-col gap-3">
+          <TagLanguageToggle
+            value={tagLanguage}
+            onChange={onChangeTagLanguage}
+          />
+
+          <div className="rounded-xl border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
+            English labels are usually easier for cluster inspection and avoid inflected forms in dense analytical views.
           </div>
-          <TagLanguageToggle value={tagLanguage} onChange={onChangeTagLanguage} />
         </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border bg-background px-3 py-1 text-xs text-foreground"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <GeoBreakdownCard
-        items={[
-          { code: "CN", share: 40, color: "#0f766e" },
-          { code: "RU", share: 30, color: "#2563eb" },
-          { code: "PL", share: 20, color: "#7c3aed" },
-          { code: "OTH", share: 10, color: "#94a3b8" },
-        ]}
-      />
-
-      <PolarityCard
-        leftTitle="Chinese media frames chip controls as economic containment."
-        leftMeta="Source cluster: CN · cosine outlier A"
-        rightTitle="Polish coverage stresses strategic security and supply risks."
-        rightMeta="Source cluster: PL · cosine outlier B"
-      />
-    </aside>
+      </RightPanelSection>
+    </div>
   );
 }
