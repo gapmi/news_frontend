@@ -42,13 +42,11 @@ function GraphCanvas({
   const { nodes, edges } = useMemo(() => {
     const sourceNodes = data?.nodes ?? [];
 
-    const runOrder = Array.from(
-      new Set(sourceNodes.map((node) => node.runId)),
-    ).sort((a, b) => a - b);
-
-    const runIndex = new Map(
-      runOrder.map((runId, index) => [runId, index]),
+    const runOrder = Array.from(new Set(sourceNodes.map((node) => node.runId))).sort(
+      (a, b) => a - b,
     );
+
+    const runIndex = new Map(runOrder.map((runId, index) => [runId, index]));
 
     const nodesByRun = new Map<number, GraphNode[]>();
     for (const node of sourceNodes) {
@@ -136,7 +134,7 @@ function GraphCanvas({
   }
 
   return (
-    <div className="h-[640px] w-full overflow-hidden rounded-xl border bg-background">
+    <div className="h-[460px] w-full overflow-hidden rounded-xl border bg-background sm:h-[540px] lg:h-[640px]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -168,9 +166,9 @@ function GraphCanvas({
 
 export default function LineageFlow(props: Props) {
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
+    <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
       <div className="mb-3">
-        <h2 className="text-lg font-medium">Cluster graph</h2>
+        <h2 className="text-base font-medium sm:text-lg">Cluster graph</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Click a cluster to inspect its articles, or an edge to inspect lineage overlap.
         </p>

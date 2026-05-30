@@ -362,15 +362,15 @@ export default function MultiRunSankey({
 
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-base font-medium">Multi-run lineage</h3>
+          <h3 className="text-sm font-medium sm:text-base">Multi-run lineage</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Runs {minRunId ?? "—"} → {maxRunId ?? "—"}. Showing top {MAX_NODES_PER_COLUMN} nodes per run plus aggregated remainder.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+        <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
           <div className="rounded-md border bg-background px-3 py-2">
             Nodes: <span className="font-medium text-foreground">{layoutNodes.length}</span>
           </div>
@@ -386,7 +386,7 @@ export default function MultiRunSankey({
       <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
           viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
-          className="h-[760px]"
+          className="h-[520px] sm:h-[620px] lg:h-[760px]"
           style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
         >
           <defs>

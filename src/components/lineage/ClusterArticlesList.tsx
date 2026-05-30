@@ -27,17 +27,13 @@ export default function ClusterArticlesList({
           key={article.id}
           className="rounded-xl border border-border/70 bg-background px-4 py-4"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold leading-6 text-foreground">
-                {article.title ?? "Untitled article"}
-              </h3>
+          <h3 className="text-sm font-semibold leading-6 text-foreground">
+            {article.title ?? "Untitled article"}
+          </h3>
 
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>{article.source ?? "Unknown source"}</span>
-                <span>{formatDateTime(article.published)}</span>
-              </div>
-            </div>
+          <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-3 sm:gap-y-1">
+            <span>{article.source ?? "Unknown source"}</span>
+            <span>{formatDateTime(article.published)}</span>
           </div>
 
           {article.url ? (
@@ -46,7 +42,7 @@ export default function ClusterArticlesList({
                 href={article.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
                 Open article
               </a>
