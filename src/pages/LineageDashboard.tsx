@@ -55,6 +55,21 @@ function MetricCard({
   );
 }
 
+function SectionMetaChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{label}:</span>{" "}
+      <span>{value}</span>
+    </div>
+  );
+}
+
 export default function LineageDashboard() {
   const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
@@ -291,7 +306,27 @@ export default function LineageDashboard() {
         <div className="space-y-6">
           <AnalyticsSection
             title="Lineage flow"
-            description={`Runs ${sankeyWindow?.startRunId ?? "—"} → ${sankeyWindow?.endRunId ?? "—"} · overview of multi-run transitions`}
+            description="Multi-run overview of lineage transitions across the active window."
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <SectionMetaChip
+                  label="Window"
+                  value={
+                    sankeyWindow
+                      ? `${sankeyWindow.startRunId} → ${sankeyWindow.endRunId}`
+                      : "—"
+                  }
+                />
+                <SectionMetaChip
+                  label="Min score"
+                  value={formatNumber(minScore)}
+                />
+                <SectionMetaChip
+                  label="Selected edge"
+                  value={selectedEdge ? `#${selectedEdge.edgeId}` : "None"}
+                />
+              </div>
+            }
           >
             {!sankeyParams ? (
               <SectionState kind="empty" title="No lineage window selected" />
@@ -316,7 +351,31 @@ export default function LineageDashboard() {
 
           <AnalyticsSection
             title="Semantic map"
-            description={`Preserved cluster topology workspace · anchor run ${parentRunId ?? "—"} · pair ${parentRunId ?? "—"} → ${childRunId ?? "—"}`}
+            description="Preserved cluster topology workspace for cluster and edge exploration."
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <SectionMetaChip
+                  label="Anchor"
+                  value={parentRunId !== null ? String(parentRunId) : "—"}
+                />
+                <SectionMetaChip
+                  label="Pair"
+                  value={
+                    parentRunId !== null && childRunId !== null
+                      ? `${parentRunId} → ${childRunId}`
+                      : "—"
+                  }
+                />
+                <SectionMetaChip
+                  label="Cluster focus"
+                  value={
+                    selectedCluster
+                      ? `C${selectedCluster.clusterId}`
+                      : "None"
+                  }
+                />
+              </div>
+            }
           >
             {!graphParams ? (
               <SectionState kind="empty" title="No graph window selected" />
