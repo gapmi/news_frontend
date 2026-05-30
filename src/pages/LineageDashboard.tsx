@@ -473,10 +473,37 @@ export default function LineageDashboard() {
               </section>
             </div>
 
+            <div className="space-y-4">
             <LineageRightPanel
-              tagLanguage={tagLanguage}
-              onChangeTagLanguage={setTagLanguage}
+                tagLanguage={tagLanguage}
+                onChangeTagLanguage={setTagLanguage}
             />
+
+            <section className="rounded-xl border bg-card p-4 shadow-sm">
+                <h2 className="text-lg font-medium">Selected cluster</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                Temporary debug panel for cluster click.
+                </p>
+
+                {selectedCluster ? (
+                <div className="mt-4 space-y-2 text-sm">
+                    <div>
+                    <span className="text-muted-foreground">Run:</span> {selectedCluster.runId}
+                    </div>
+                    <div>
+                    <span className="text-muted-foreground">Cluster:</span> C{selectedCluster.clusterId}
+                    </div>
+                    <div>
+                    <span className="text-muted-foreground">Label:</span> {selectedCluster.label ?? "—"}
+                    </div>
+                </div>
+                ) : (
+                <div className="mt-4 text-sm text-muted-foreground">
+                    No cluster selected.
+                </div>
+                )}
+            </section>
+            </div>
           </section>
         </div>
       </main>
