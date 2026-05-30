@@ -5,6 +5,7 @@ type Props = {
   data: SankeyResponse;
   selectedEdgeId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
+  onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
 };
 
 type PreparedNode = SankeyNode & {
@@ -37,26 +38,18 @@ type LayoutLink = {
   isSynthetic?: boolean;
 };
 
-const SVG_WIDTH = 1400;
 const SVG_HEIGHT = 760;
-
 const PADDING_TOP = 84;
 const PADDING_BOTTOM = 52;
-
-const NODE_WIDTH = 160;
 const COLUMN_GAP = 220;
 const PADDING_LEFT = 72;
 const PADDING_RIGHT = 72;
-
 const COLUMN_NODE_WIDTH = 136;
 const NODE_GAP = 14;
-
 const MIN_NODE_HEIGHT = 24;
 const MAX_NODE_HEIGHT = 88;
-
 const MIN_STROKE = 2;
 const MAX_STROKE = 18;
-
 const MAX_NODES_PER_COLUMN = 8;
 
 function clamp(value: number, min: number, max: number) {
@@ -111,6 +104,7 @@ export default function MultiRunSankey({
   data,
   selectedEdgeId = null,
   onSelectEdge,
+  onSelectCluster,
 }: Props) {
   const {
     columns,
@@ -122,7 +116,6 @@ export default function MultiRunSankey({
   } = useMemo(() => {
     const nodes = data.nodes ?? [];
     const links = data.links ?? [];
-       
 
     const grouped = new Map<number, SankeyNode[]>();
     for (const node of nodes) {
@@ -154,72 +147,75 @@ export default function MultiRunSankey({
       nodes: PreparedNode[];
     }> = [];
 
-for (const [columnIndex, depth] of sortedDepths.entries()) {
-  const sourceNodes = grouped.get(depth) ?? [];
+    for (const [columnIndex, depth] of sortedDepths.entries()) {
+      const sourceNodes = grouped.get(depth) ?? [];
 
-  const prepared: PreparedNode[] = sourceNodes
-    .map((node) => {
-      const inbound = inboundMap.get(node.id) ?? 0;
-      const outbound = outboundMap.get(node.id) ?? 0;
-      const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
+      const prepared: PreparedNode[] = sourceNodes
+        .map((node) => {
+          const inbound = inboundMap.get(node.id) ?? 0;
+          const outbound = outboundMap.get(node.id) ?? 0;
+          const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
 
-      return {
-        ...node,
-        inbound,
-        outbound,
-        totalFlow,
-      };
-    })
-    .sort((a, b) => {
-      if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
-      if (b.size !== a.size) return b.size - a.size;
-      return a.clusterId - b.clusterId;
-    });
+          return {
+            ...node,
+            inbound,
+            outbound,
+            totalFlow,
+          };
+        })
+        .sort((a, b) => {
+          if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
+          if (b.size !== a.size) return b.size - a.size;
+          return a.clusterId - b.clusterId;
+        });
 
-  const visible: PreparedNode[] = prepared.slice(0, MAX_NODES_PER_COLUMN);
-  const hidden: PreparedNode[] = prepared.slice(MAX_NODES_PER_COLUMN);
+      const visible: PreparedNode[] = prepared.slice(0, MAX_NODES_PER_COLUMN);
+      const hidden: PreparedNode[] = prepared.slice(MAX_NODES_PER_COLUMN);
 
-  const visibleIds = new Set(visible.map((node) => node.id));
-  const hiddenIds = new Set(hidden.map((node) => node.id));
+      const visibleIds = new Set(visible.map((node) => node.id));
+      const hiddenIds = new Set(hidden.map((node) => node.id));
 
-  visibleNodeIdMap.set(depth, visibleIds);
-  hiddenNodeIdMap.set(depth, hiddenIds);
+      visibleNodeIdMap.set(depth, visibleIds);
+      hiddenNodeIdMap.set(depth, hiddenIds);
 
-  if (hidden.length > 0) {
-    const otherSize = hidden.reduce((sum, node) => sum + node.size, 0);
-    const otherInbound = hidden.reduce((sum, node) => sum + node.inbound, 0);
-    const otherOutbound = hidden.reduce((sum, node) => sum + node.outbound, 0);
-    const otherFlow = hidden.reduce((sum, node) => sum + node.totalFlow, 0);
+      if (hidden.length > 0) {
+        const otherSize = hidden.reduce((sum, node) => sum + node.size, 0);
+        const otherInbound = hidden.reduce((sum, node) => sum + node.inbound, 0);
+        const otherOutbound = hidden.reduce((sum, node) => sum + node.outbound, 0);
+        const otherFlow = hidden.reduce((sum, node) => sum + node.totalFlow, 0);
 
-    const otherNode: PreparedNode = {
-      id: `other:${depth}`,
-      label: "Other",
-      runId: hidden[0].runId,
-      clusterId: -1,
-      clusterLabel: -1,
-      size: otherSize,
-      depth,
-      meta: {
-        nameShort: `Other (${hidden.length})`,
-      } as SankeyNode["meta"],
-      inbound: otherInbound,
-      outbound: otherOutbound,
-      totalFlow: otherFlow,
-      isOther: true,
-    };
+        const otherNode: PreparedNode = {
+          id: `other:${depth}`,
+          label: "Other",
+          runId: hidden[0].runId,
+          clusterId: -1,
+          clusterLabel: -1,
+          size: otherSize,
+          depth,
+          meta: {
+            nameShort: `Other (${hidden.length})`,
+          } as SankeyNode["meta"],
+          inbound: otherInbound,
+          outbound: otherOutbound,
+          totalFlow: otherFlow,
+          isOther: true,
+        };
 
-    visible.push(otherNode);
-  }
+        visible.push(otherNode);
+      }
 
-  preparedColumns.push({
-    depth,
-    columnIndex,
-    runId: prepared[0]?.runId ?? null,
-    nodes: visible,
-  });
-}
+      preparedColumns.push({
+        depth,
+        columnIndex,
+        runId: prepared[0]?.runId ?? null,
+        nodes: visible,
+      });
+    }
 
-    const remappedLinksMap = new Map<string, Omit<LayoutLink, "sourceNode" | "targetNode" | "strokeWidth" | "path">>();
+    const remappedLinksMap = new Map<
+      string,
+      Omit<LayoutLink, "sourceNode" | "targetNode" | "strokeWidth" | "path">
+    >();
 
     function mapNodeId(originalNodeId: string, depth: number) {
       const visibleIds = visibleNodeIdMap.get(depth) ?? new Set<string>();
@@ -244,9 +240,7 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
 
       const mappedSource = mapNodeId(link.source, sourceNode.depth);
       const mappedTarget = mapNodeId(link.target, targetNode.depth);
-
       const aggregateKey = `${mappedSource}->${mappedTarget}`;
-
       const existing = remappedLinksMap.get(aggregateKey);
 
       if (existing) {
@@ -256,7 +250,10 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
         if (existing.edgeId === null) {
           existing.edgeId = getNumericEdgeId(link);
         }
-        existing.isSynthetic = existing.isSynthetic || mappedSource.startsWith("other:") || mappedTarget.startsWith("other:");
+        existing.isSynthetic =
+          existing.isSynthetic ||
+          mappedSource.startsWith("other:") ||
+          mappedTarget.startsWith("other:");
       } else {
         remappedLinksMap.set(aggregateKey, {
           id: aggregateKey,
@@ -266,14 +263,14 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
           score: link.score,
           similarity: link.similarity,
           edgeId: getNumericEdgeId(link),
-          isSynthetic: mappedSource.startsWith("other:") || mappedTarget.startsWith("other:"),
+          isSynthetic:
+            mappedSource.startsWith("other:") || mappedTarget.startsWith("other:"),
         });
       }
     }
 
     const allPreparedNodes = preparedColumns.flatMap((column) => column.nodes);
     const maxNodeFlow = Math.max(...allPreparedNodes.map((node) => node.totalFlow), 1);
-
     const layoutNodes: LayoutNode[] = [];
 
     for (const column of preparedColumns) {
@@ -356,6 +353,7 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
       </div>
     );
   }
+
   const svgWidth =
     PADDING_LEFT +
     PADDING_RIGHT +
@@ -387,10 +385,10 @@ for (const [columnIndex, depth] of sortedDepths.entries()) {
 
       <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
-            viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
-            className="h-[760px]"
-            style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
-            >
+          viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
+          className="h-[760px]"
+          style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
+        >
           <defs>
             <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
               <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0.55" />
@@ -460,8 +458,18 @@ Similarity: ${formatNumber(link.similarity, 3)}${
                   (link.sourceNode.id === node.id || link.targetNode.id === node.id),
               );
 
+            const isClusterSelectable =
+              !node.isOther && typeof node.clusterId === "number" && node.clusterId > 0;
+
             return (
-              <g key={node.id}>
+              <g
+                key={node.id}
+                className={isClusterSelectable ? "cursor-pointer" : undefined}
+                onClick={() => {
+                  if (!isClusterSelectable) return;
+                  onSelectCluster?.(node.runId, node.clusterId, label);
+                }}
+              >
                 <rect
                   x={node.x}
                   y={node.y}
