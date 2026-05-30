@@ -8,7 +8,7 @@ interface DashboardPageHeaderProps {
   pipelineStatus: string | null;
 }
 
-function MetaChip({
+function HeaderMetaItem({
   label,
   value,
 }: {
@@ -16,11 +16,11 @@ function MetaChip({
   value: string | number | null;
 }) {
   return (
-    <div className="rounded-xl border bg-background px-3 py-2">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-3">
+      <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-sm font-medium text-foreground">
+      <div className="mt-1 text-sm font-semibold tracking-tight text-foreground">
         {value ?? "—"}
       </div>
     </div>
@@ -37,14 +37,14 @@ export default function DashboardPageHeader({
   pipelineStatus,
 }: DashboardPageHeaderProps) {
   return (
-    <section className="rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-col gap-5 px-5 py-5 xl:flex-row xl:items-start xl:justify-between">
+    <section className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
+      <div className="grid gap-6 px-5 py-6 xl:grid-cols-[minmax(0,1.25fr)_420px] xl:px-6">
         <div className="min-w-0">
-          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Lineage analytics
+          <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+            Lineage dashboard
           </div>
 
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
             {title}
           </h1>
 
@@ -53,9 +53,16 @@ export default function DashboardPageHeader({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:min-w-[520px]">
-          <MetaChip label="Pair" value={parentRunId !== null && childRunId !== null ? `${parentRunId} → ${childRunId}` : "—"} />
-          <MetaChip
+        <div className="grid grid-cols-2 gap-3">
+          <HeaderMetaItem
+            label="Pair"
+            value={
+              parentRunId !== null && childRunId !== null
+                ? `${parentRunId} → ${childRunId}`
+                : "—"
+            }
+          />
+          <HeaderMetaItem
             label="Window"
             value={
               windowStartRunId !== null && windowEndRunId !== null
@@ -63,8 +70,8 @@ export default function DashboardPageHeader({
                 : "—"
             }
           />
-          <MetaChip label="Anchor run" value={parentRunId} />
-          <MetaChip label="Pipeline" value={pipelineStatus ?? "—"} />
+          <HeaderMetaItem label="Anchor run" value={parentRunId} />
+          <HeaderMetaItem label="Pipeline" value={pipelineStatus ?? "—"} />
         </div>
       </div>
     </section>
