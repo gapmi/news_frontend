@@ -9,9 +9,9 @@ import {
   getPipelineRuns,
   getSankeyView,
 } from "@/api/clustering";
-import RunTimelineSlider from "@/components/lineage/RunTimelineSlider";
 import LineageEdgesSection from "@/components/lineage/LineageEdgesSection";
 import LineageContextPanel from "@/components/lineage/LineageContextPanel";
+import LineageControlsSection from "@/components/lineage/LineageControlsSection";
 import EulerDetailModal from "@/components/lineage/EulerDetailModal";
 import MultiRunSankey from "@/components/charts/MultiRunSankey";
 import LineageFlow from "@/components/charts/LineageFlow";
@@ -266,43 +266,26 @@ export default function LineageDashboard() {
         pipelineStatus={latestPipelineRun?.status ?? null}
       />
 
-      <AnalyticsSection
-        title="Controls"
-        description="Select the active anchor run, adjacent pair, and score threshold for the analysis window."
-        actions={
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Min score</span>
-            <input
-              className="w-24 rounded-md border bg-background px-3 py-2"
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={minScore}
-              onChange={(event) => {
-                setMinScore(Number(event.target.value));
-                setSelectedEdgeId(null);
-                setSelectedCluster(null);
-              }}
-            />
-          </label>
-        }
-      >
-        <RunTimelineSlider
-          runIds={timelineRunIds}
-          selectedRunId={parentRunId}
-          onSelectRun={(runId) => {
-            const nextChildOptions = availablePairs
-              .filter((pair) => pair.parentRunId === runId)
-              .map((pair) => pair.childRunId);
+      <LineageControlsSection
+        minScore={minScore}
+        onChangeMinScore={(value) => {
+          setMinScore(value);
+          setSelectedEdgeId(null);
+          setSelectedCluster(null);
+        }}
+        timelineRunIds={timelineRunIds}
+        parentRunId={parentRunId}
+        onSelectRun={(runId) => {
+          const nextChildOptions = availablePairs
+            .filter((pair) => pair.parentRunId === runId)
+            .map((pair) => pair.childRunId);
 
-            setManualParentRunId(runId);
-            setManualChildRunId(nextChildOptions[0] ?? null);
-            setSelectedEdgeId(null);
-            setSelectedCluster(null);
-          }}
-        />
-      </AnalyticsSection>
+          setManualParentRunId(runId);
+          setManualChildRunId(nextChildOptions[0] ?? null);
+          setSelectedEdgeId(null);
+          setSelectedCluster(null);
+        }}
+      />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
         <div className="space-y-6">
