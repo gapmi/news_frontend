@@ -10,12 +10,15 @@ import {
   getSankeyView,
   type LineageEdge,
 } from "@/api/clustering";
-import StoryHeaderCard from "@/components/lineage/StoryHeaderCard";
 import RunTimelineSlider from "@/components/lineage/RunTimelineSlider";
 import LineageRightPanel from "@/components/lineage/LineageRightPanel";
 import EulerDetailModal from "@/components/lineage/EulerDetailModal";
 import MultiRunSankey from "@/components/charts/MultiRunSankey";
 import LineageFlow from "@/components/charts/LineageFlow";
+import LineagePageShell from "@/components/lineage/page/LineagePageShell";
+import AnalyticsSection from "@/components/lineage/page/AnalyticsSection";
+import DashboardPageHeader from "@/components/lineage/page/DashboardPageHeader";
+import SectionState from "@/components/lineage/page/SectionState";
 import { getLineageWindow } from "@/utils/lineageWindow";
 
 interface RunPair {
@@ -30,6 +33,26 @@ function formatDateTime(value: string | null) {
 
 function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
+function MetricCard({
+  label,
+  value,
+  meta,
+}: {
+  label: string;
+  value: string | number;
+  meta: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card px-4 py-4 shadow-sm">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
+    </div>
+  );
 }
 
 export default function LineageDashboard() {
@@ -115,10 +138,6 @@ export default function LineageDashboard() {
     setSelectedCluster(null);
   }, [parentRunId, childRunId, minScore]);
 
-  useEffect(() => {
-    console.log("selectedCluster", selectedCluster);
-  }, [selectedCluster]);
-
   const sankeyWindow = useMemo(() => {
     if (parentRunId === null) return null;
     return getLineageWindow(sortedLineageRunIds, parentRunId, 5);
@@ -203,15 +222,15 @@ export default function LineageDashboard() {
 
   const storyTitle =
     latestRun?.clusterCount
-      ? "Taiwan chip sanctions storyline"
-      : "Storyline preview";
+      ? "Cluster lineage analysis"
+      : "Lineage overview";
 
   const storySubtitle =
     latestPipelineRun?.status
       ? `Latest pipeline run: ${latestPipelineRun.status}. Last start: ${formatDateTime(
           latestPipelineRun.startedAt,
         )}.`
-      : "Track how a storyline flows through adjacent lineage runs and inspect overlap on demand.";
+      : "Track storyline flow across adjacent lineage runs and inspect overlap on demand.";
 
   const clusterLabelByRef = useMemo(() => {
     const map = new Map<string, string>();
@@ -237,282 +256,335 @@ export default function LineageDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto max-w-[1600px] px-4 py-6">
-        <div className="grid gap-4">
-          <StoryHeaderCard title={storyTitle} subtitle={storySubtitle} />
+    <LineagePageShell>
+      <DashboardPageHeader
+        title={storyTitle}
+        subtitle={storySubtitle}
+        parentRunId={parentRunId}
+        childRunId={childRunId}
+        windowStartRunId={sankeyWindow?.startRunId ?? null}
+        windowEndRunId={sankeyWindow?.endRunId ?? null}
+        pipelineStatus={latestPipelineRun?.status ?? null}
+      />
 
-          <RunTimelineSlider
-            runIds={timelineRunIds}
-            selectedRunId={parentRunId}
-            onSelectRun={(runId) => {
-              const nextChildOptions = availablePairs
-                .filter((pair) => pair.parentRunId === runId)
-                .map((pair) => pair.childRunId);
+      <AnalyticsSection
+        title="Controls"
+        description="Select the active anchor run, pair window, score threshold, and current graph mode."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-lg border bg-background p-1 text-xs">
+              <button
+                type="button"
+                className={
+                  viewMode === "sankey"
+                    ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+                    : "px-3 py-1.5 text-muted-foreground"
+                }
+                onClick={() => setViewMode("sankey")}
+              >
+                Sankey
+              </button>
+              <button
+                type="button"
+                className={
+                  viewMode === "graph"
+                    ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+                    : "px-3 py-1.5 text-muted-foreground"
+                }
+                onClick={() => setViewMode("graph")}
+              >
+                Graph
+              </button>
+            </div>
 
-              setManualParentRunId(runId);
-              setManualChildRunId(nextChildOptions[0] ?? null);
-              setSelectedEdgeId(null);
-              setSelectedCluster(null);
-            }}
-          />
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Min score</span>
+              <input
+                className="w-24 rounded-md border bg-background px-3 py-2"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={minScore}
+                onChange={(event) => {
+                  setMinScore(Number(event.target.value));
+                  setSelectedEdgeId(null);
+                  setSelectedCluster(null);
+                }}
+              />
+            </label>
+          </div>
+        }
+      >
+        <RunTimelineSlider
+          runIds={timelineRunIds}
+          selectedRunId={parentRunId}
+          onSelectRun={(runId) => {
+            const nextChildOptions = availablePairs
+              .filter((pair) => pair.parentRunId === runId)
+              .map((pair) => pair.childRunId);
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_360px]">
-            <div className="space-y-4">
-              <section className="rounded-xl border bg-card p-4 shadow-sm">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-medium">Semantic map</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Anchor run {parentRunId ?? "—"} · Pair {parentRunId ?? "—"} →{" "}
-                      {childRunId ?? "—"} · Window {sankeyWindow?.startRunId ?? "—"} →{" "}
-                      {sankeyWindow?.endRunId ?? "—"}
-                    </p>
-                  </div>
+            setManualParentRunId(runId);
+            setManualChildRunId(nextChildOptions[0] ?? null);
+            setSelectedEdgeId(null);
+            setSelectedCluster(null);
+          }}
+        />
+      </AnalyticsSection>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="rounded-lg border bg-background p-1 text-xs">
-                      <button
-                        type="button"
-                        className={
-                          viewMode === "sankey"
-                            ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-                            : "px-3 py-1.5 text-muted-foreground"
-                        }
-                        onClick={() => setViewMode("sankey")}
-                      >
-                        Sankey
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          viewMode === "graph"
-                            ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-                            : "px-3 py-1.5 text-muted-foreground"
-                        }
-                        onClick={() => setViewMode("graph")}
-                      >
-                        Graph
-                      </button>
-                    </div>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
+        <div className="space-y-6">
+          <AnalyticsSection
+            title={viewMode === "sankey" ? "Lineage flow" : "Semantic map"}
+            description={
+              viewMode === "sankey"
+                ? `Runs ${sankeyWindow?.startRunId ?? "—"} → ${sankeyWindow?.endRunId ?? "—"}`
+                : `Anchor run ${parentRunId ?? "—"} · Pair ${parentRunId ?? "—"} → ${childRunId ?? "—"}`
+            }
+          >
+            {viewMode === "sankey" ? (
+              !sankeyParams ? (
+                <SectionState kind="empty" title="No lineage window selected" />
+              ) : sankeyQuery.isLoading && !sankeyQuery.data ? (
+                <SectionState kind="loading" title="Loading Sankey data" />
+              ) : sankeyQuery.error ? (
+                <SectionState
+                  kind="error"
+                  title="Failed to load Sankey"
+                  message={(sankeyQuery.error as Error).message}
+                />
+              ) : sankeyQuery.data ? (
+                <MultiRunSankey
+                  data={sankeyQuery.data}
+                  selectedEdgeId={selectedEdgeId}
+                  onSelectEdge={setSelectedEdgeId}
+                />
+              ) : (
+                <SectionState kind="empty" title="No Sankey data available" />
+              )
+            ) : !graphParams ? (
+              <SectionState kind="empty" title="No graph window selected" />
+            ) : graphQuery.isLoading && !graphQuery.data ? (
+              <SectionState kind="loading" title="Loading semantic graph" />
+            ) : graphQuery.error ? (
+              <SectionState
+                kind="error"
+                title="Failed to load semantic graph"
+                message={(graphQuery.error as Error).message}
+              />
+            ) : graphQuery.data ? (
+              <LineageFlow
+                data={graphQuery.data}
+                selectedEdgeId={selectedEdgeId}
+                onSelectEdge={setSelectedEdgeId}
+                onSelectCluster={handleSelectCluster}
+              />
+            ) : (
+              <SectionState kind="empty" title="No graph data available" />
+            )}
+          </AnalyticsSection>
 
-                    <label className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Min score</span>
-                      <input
-                        className="w-24 rounded-md border bg-background px-3 py-2"
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={minScore}
-                        onChange={(event) => {
-                          setMinScore(Number(event.target.value));
-                          setSelectedEdgeId(null);
-                          setSelectedCluster(null);
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
+          <AnalyticsSection
+            title="Lineage inspection"
+            description={`Detailed parent/child edge pairs for run ${parentRunId ?? "—"} → ${childRunId ?? "—"}`}
+          >
+            {edgesQuery.error ? (
+              <SectionState
+                kind="error"
+                title="Failed to load lineage edges"
+                message={(edgesQuery.error as Error).message}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-2 pr-4 font-medium">Edge</th>
+                      <th className="py-2 pr-4 font-medium">Parent</th>
+                      <th className="py-2 pr-4 font-medium">Child</th>
+                      <th className="py-2 pr-4 font-medium">Score</th>
+                      <th className="py-2 pr-4 font-medium">Similarity</th>
+                      <th className="py-2 pr-4 font-medium">Overlap</th>
+                    </tr>
+                  </thead>
 
-                {sankeyQuery.isLoading && (
-                  <p className="text-sm text-muted-foreground">Loading Sankey…</p>
-                )}
+                  <tbody>
+                    {edges.map((edge: LineageEdge) => {
+                      const isSelected = selectedEdgeId === edge.edgeId;
 
-                {sankeyQuery.error && (
-                  <p className="text-sm text-red-600">
-                    {(sankeyQuery.error as Error).message}
-                  </p>
-                )}
+                      return (
+                        <tr
+                          key={edge.edgeId}
+                          className={
+                            isSelected
+                              ? "cursor-pointer border-b bg-muted hover:bg-muted"
+                              : "cursor-pointer border-b hover:bg-muted/50"
+                          }
+                          onClick={() => setSelectedEdgeId(edge.edgeId)}
+                        >
+                          <td className="py-3 pr-4 align-top">{edge.edgeId}</td>
 
-                {viewMode === "sankey" && sankeyQuery.data && (
-                  <MultiRunSankey
-                    data={sankeyQuery.data}
-                    selectedEdgeId={selectedEdgeId}
-                    onSelectEdge={setSelectedEdgeId}
-                  />
-                )}
+                          <td className="py-3 pr-4 align-top">
+                            <div className="font-medium">
+                              {formatClusterTitle(
+                                edge.parentClusterId,
+                                getClusterTag(edge.parentRunId, edge.parentClusterId),
+                              )}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Run {edge.parentRunId} · size {edge.parentSize}
+                            </div>
+                          </td>
 
-                {viewMode === "graph" && graphQuery.data && (
-                  <LineageFlow
-                    data={graphQuery.data}
-                    selectedEdgeId={selectedEdgeId}
-                    onSelectEdge={setSelectedEdgeId}
-                    onSelectCluster={handleSelectCluster}
-                  />
-                )}
-              </section>
+                          <td className="py-3 pr-4 align-top">
+                            <div className="font-medium">
+                              {formatClusterTitle(
+                                edge.childClusterId,
+                                getClusterTag(edge.childRunId, edge.childClusterId),
+                              )}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Run {edge.childRunId} · size {edge.childSize}
+                            </div>
+                          </td>
 
-              <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <div className="rounded-xl border bg-card p-4 shadow-sm">
-                  <h2 className="text-lg font-medium">Lineage edges</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Detail pair table for Euler inspection
-                  </p>
-
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="py-2 pr-4">Edge</th>
-                          <th className="py-2 pr-4">Parent</th>
-                          <th className="py-2 pr-4">Child</th>
-                          <th className="py-2 pr-4">Score</th>
-                          <th className="py-2 pr-4">Similarity</th>
-                          <th className="py-2 pr-4">Overlap</th>
+                          <td className="py-3 pr-4 align-top">{formatNumber(edge.score)}</td>
+                          <td className="py-3 pr-4 align-top">
+                            {formatNumber(edge.centroidSimilarity)}
+                          </td>
+                          <td className="py-3 pr-4 align-top">
+                            {edge.articleOverlapCount} ({formatNumber(edge.articleOverlapRatio)})
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {edges.map((edge: LineageEdge) => {
-                          const isSelected = selectedEdgeId === edge.edgeId;
+                      );
+                    })}
 
-                          return (
-                            <tr
-                              key={edge.edgeId}
-                              className={
-                                isSelected
-                                  ? "cursor-pointer border-b bg-muted hover:bg-muted"
-                                  : "cursor-pointer border-b hover:bg-muted/50"
-                              }
-                              onClick={() => setSelectedEdgeId(edge.edgeId)}
-                            >
-                              <td className="py-2 pr-4">{edge.edgeId}</td>
-                              <td className="py-2 pr-4">
-                                <div className="font-medium">
-                                  {formatClusterTitle(
-                                    edge.parentClusterId,
-                                    getClusterTag(edge.parentRunId, edge.parentClusterId),
-                                  )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Run {edge.parentRunId} · size {edge.parentSize}
-                                </div>
-                              </td>
-                              <td className="py-2 pr-4">
-                                <div className="font-medium">
-                                  {formatClusterTitle(
-                                    edge.childClusterId,
-                                    getClusterTag(edge.childRunId, edge.childClusterId),
-                                  )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Run {edge.childRunId} · size {edge.childSize}
-                                </div>
-                              </td>
-                              <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
-                              <td className="py-2 pr-4">
-                                {formatNumber(edge.centroidSimilarity)}
-                              </td>
-                              <td className="py-2 pr-4">
-                                {edge.articleOverlapCount} (
-                                {formatNumber(edge.articleOverlapRatio)})
-                              </td>
-                            </tr>
-                          );
-                        })}
+                    {edgesQuery.isLoading && edges.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-sm text-muted-foreground">
+                          Loading lineage edges…
+                        </td>
+                      </tr>
+                    )}
 
-                        {edges.length === 0 && !edgesQuery.isLoading && (
-                          <tr>
-                            <td colSpan={6} className="py-4 text-muted-foreground">
-                              No lineage edges found for the selected pair.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
+                    {!edgesQuery.isLoading && edges.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-sm text-muted-foreground">
+                          No lineage edges found for the selected pair.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AnalyticsSection>
 
-              <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Runs
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">{runs.length}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Latest run: {latestRun?.runId ?? "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Clusters
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {latestRun?.clusterCount ?? "—"}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Noise: {latestRun?.noiseCount ?? "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Lineage edges
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {totalVisibleLineageEdges}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Window size: {timelineRunIds.length}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Pipeline
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {latestPipelineRun?.status ?? "—"}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {formatDateTime(latestPipelineRun?.startedAt ?? null)}
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <div className="space-y-4">
-            <LineageRightPanel
-                tagLanguage={tagLanguage}
-                onChangeTagLanguage={setTagLanguage}
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Runs"
+              value={runs.length}
+              meta={`Latest run: ${latestRun?.runId ?? "—"}`}
             />
-
-            <section className="rounded-xl border bg-card p-4 shadow-sm">
-                <h2 className="text-lg font-medium">Selected cluster</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                Temporary debug panel for cluster click.
-                </p>
-
-                {selectedCluster ? (
-                <div className="mt-4 space-y-2 text-sm">
-                    <div>
-                    <span className="text-muted-foreground">Run:</span> {selectedCluster.runId}
-                    </div>
-                    <div>
-                    <span className="text-muted-foreground">Cluster:</span> C{selectedCluster.clusterId}
-                    </div>
-                    <div>
-                    <span className="text-muted-foreground">Label:</span> {selectedCluster.label ?? "—"}
-                    </div>
-                </div>
-                ) : (
-                <div className="mt-4 text-sm text-muted-foreground">
-                    No cluster selected.
-                </div>
-                )}
-            </section>
-            </div>
+            <MetricCard
+              label="Clusters"
+              value={latestRun?.clusterCount ?? "—"}
+              meta={`Noise: ${latestRun?.noiseCount ?? "—"}`}
+            />
+            <MetricCard
+              label="Lineage edges"
+              value={totalVisibleLineageEdges}
+              meta={`Window size: ${timelineRunIds.length}`}
+            />
+            <MetricCard
+              label="Pipeline"
+              value={latestPipelineRun?.status ?? "—"}
+              meta={formatDateTime(latestPipelineRun?.startedAt ?? null)}
+            />
           </section>
         </div>
-      </main>
+
+        <div className="space-y-6">
+          <AnalyticsSection
+            title="Context"
+            description="Secondary controls and selection context for the current lineage window."
+            contentClassName="space-y-5"
+          >
+            <LineageRightPanel
+              tagLanguage={tagLanguage}
+              onChangeTagLanguage={setTagLanguage}
+            />
+
+            <div className="rounded-xl border bg-background px-4 py-4">
+              <h3 className="text-sm font-semibold">Selected cluster</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Preserved graph interaction debug context.
+              </p>
+
+              {selectedCluster ? (
+                <div className="mt-4 space-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Run:</span>{" "}
+                    {selectedCluster.runId}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Cluster:</span>{" "}
+                    C{selectedCluster.clusterId}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Label:</span>{" "}
+                    {selectedCluster.label ?? "—"}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-muted-foreground">
+                  No cluster selected.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border bg-background px-4 py-4">
+              <h3 className="text-sm font-semibold">Selected edge</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Current edge selection synchronized with Sankey, graph, table, and Euler detail.
+              </p>
+
+              {selectedEdge ? (
+                <div className="mt-4 space-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Edge:</span>{" "}
+                    {selectedEdge.edgeId}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Pair:</span>{" "}
+                    {selectedEdge.parentRunId}:{selectedEdge.parentClusterId} →{" "}
+                    {selectedEdge.childRunId}:{selectedEdge.childClusterId}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Score:</span>{" "}
+                    {formatNumber(selectedEdge.score)}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Overlap:</span>{" "}
+                    {selectedEdge.articleOverlapCount} (
+                    {formatNumber(selectedEdge.articleOverlapRatio)})
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-muted-foreground">
+                  No edge selected.
+                </div>
+              )}
+            </div>
+          </AnalyticsSection>
+        </div>
+      </section>
 
       <EulerDetailModal
         open={selectedEdge !== null && eulerQuery.data !== undefined}
         detail={eulerQuery.data ?? null}
         onClose={() => setSelectedEdgeId(null)}
       />
-    </div>
+    </LineagePageShell>
   );
 }
