@@ -61,7 +61,6 @@ export default function LineageDashboard() {
   const [minScore, setMinScore] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
-  const [viewMode, setViewMode] = useState<"sankey" | "graph">("graph");
   const [selectedCluster, setSelectedCluster] = useState<{
     runId: number;
     clusterId: number;
@@ -220,12 +219,12 @@ export default function LineageDashboard() {
     return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
   }, [runs]);
 
-  const storyTitle =
+  const pageTitle =
     latestRun?.clusterCount
       ? "Cluster lineage analysis"
       : "Lineage overview";
 
-  const storySubtitle =
+  const pageSubtitle =
     latestPipelineRun?.status
       ? `Latest pipeline run: ${latestPipelineRun.status}. Last start: ${formatDateTime(
           latestPipelineRun.startedAt,
@@ -258,8 +257,8 @@ export default function LineageDashboard() {
   return (
     <LineagePageShell>
       <DashboardPageHeader
-        title={storyTitle}
-        subtitle={storySubtitle}
+        title={pageTitle}
+        subtitle={pageSubtitle}
         parentRunId={parentRunId}
         childRunId={childRunId}
         windowStartRunId={sankeyWindow?.startRunId ?? null}
@@ -269,51 +268,24 @@ export default function LineageDashboard() {
 
       <AnalyticsSection
         title="Controls"
-        description="Select the active anchor run, pair window, score threshold, and current graph mode."
+        description="Select the active anchor run, adjacent pair, and score threshold for the analysis window."
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-lg border bg-background p-1 text-xs">
-              <button
-                type="button"
-                className={
-                  viewMode === "sankey"
-                    ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-                    : "px-3 py-1.5 text-muted-foreground"
-                }
-                onClick={() => setViewMode("sankey")}
-              >
-                Sankey
-              </button>
-              <button
-                type="button"
-                className={
-                  viewMode === "graph"
-                    ? "rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-                    : "px-3 py-1.5 text-muted-foreground"
-                }
-                onClick={() => setViewMode("graph")}
-              >
-                Graph
-              </button>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Min score</span>
-              <input
-                className="w-24 rounded-md border bg-background px-3 py-2"
-                type="number"
-                min={0}
-                max={1}
-                step={0.05}
-                value={minScore}
-                onChange={(event) => {
-                  setMinScore(Number(event.target.value));
-                  setSelectedEdgeId(null);
-                  setSelectedCluster(null);
-                }}
-              />
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Min score</span>
+            <input
+              className="w-24 rounded-md border bg-background px-3 py-2"
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={minScore}
+              onChange={(event) => {
+                setMinScore(Number(event.target.value));
+                setSelectedEdgeId(null);
+                setSelectedCluster(null);
+              }}
+            />
+          </label>
         }
       >
         <RunTimelineSlider
@@ -335,34 +307,35 @@ export default function LineageDashboard() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
         <div className="space-y-6">
           <AnalyticsSection
-            title={viewMode === "sankey" ? "Lineage flow" : "Semantic map"}
-            description={
-              viewMode === "sankey"
-                ? `Runs ${sankeyWindow?.startRunId ?? "—"} → ${sankeyWindow?.endRunId ?? "—"}`
-                : `Anchor run ${parentRunId ?? "—"} · Pair ${parentRunId ?? "—"} → ${childRunId ?? "—"}`
-            }
+            title="Lineage flow"
+            description={`Runs ${sankeyWindow?.startRunId ?? "—"} → ${sankeyWindow?.endRunId ?? "—"} · overview of multi-run transitions`}
           >
-            {viewMode === "sankey" ? (
-              !sankeyParams ? (
-                <SectionState kind="empty" title="No lineage window selected" />
-              ) : sankeyQuery.isLoading && !sankeyQuery.data ? (
-                <SectionState kind="loading" title="Loading Sankey data" />
-              ) : sankeyQuery.error ? (
-                <SectionState
-                  kind="error"
-                  title="Failed to load Sankey"
-                  message={(sankeyQuery.error as Error).message}
-                />
-              ) : sankeyQuery.data ? (
-                <MultiRunSankey
-                  data={sankeyQuery.data}
-                  selectedEdgeId={selectedEdgeId}
-                  onSelectEdge={setSelectedEdgeId}
-                />
-              ) : (
-                <SectionState kind="empty" title="No Sankey data available" />
-              )
-            ) : !graphParams ? (
+            {!sankeyParams ? (
+              <SectionState kind="empty" title="No lineage window selected" />
+            ) : sankeyQuery.isLoading && !sankeyQuery.data ? (
+              <SectionState kind="loading" title="Loading Sankey data" />
+            ) : sankeyQuery.error ? (
+              <SectionState
+                kind="error"
+                title="Failed to load Sankey"
+                message={(sankeyQuery.error as Error).message}
+              />
+            ) : sankeyQuery.data ? (
+              <MultiRunSankey
+                data={sankeyQuery.data}
+                selectedEdgeId={selectedEdgeId}
+                onSelectEdge={setSelectedEdgeId}
+              />
+            ) : (
+              <SectionState kind="empty" title="No Sankey data available" />
+            )}
+          </AnalyticsSection>
+
+          <AnalyticsSection
+            title="Semantic map"
+            description={`Preserved cluster topology workspace · anchor run ${parentRunId ?? "—"} · pair ${parentRunId ?? "—"} → ${childRunId ?? "—"}`}
+          >
+            {!graphParams ? (
               <SectionState kind="empty" title="No graph window selected" />
             ) : graphQuery.isLoading && !graphQuery.data ? (
               <SectionState kind="loading" title="Loading semantic graph" />
