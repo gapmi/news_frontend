@@ -165,22 +165,21 @@ export default function MultiRunSankey({
         const otherFlow = hidden.reduce((sum, node) => sum + node.totalFlow, 0);
 
         const otherNode: PreparedNode = {
-          id: `other-${depth}`,
-          label: "Other",
-          runId: hidden[0].runId,
-          clusterId: -1,
-          clusterLabel: -1,
-          size: otherSize,
-          depth,
-          meta: { nameShort: `Other (${hidden.length})` } as SankeyNode["meta"],
-          inbound: otherInbound,
-          outbound: otherOutbound,
-          totalFlow: otherFlow,
-          isOther: true,
-          group: hidden[0].group,
-          type: hidden[0].type,
-          positionHint: hidden[0].positionHint,
-          styleHints: hidden[0].styleHints,
+        id: `other-${depth}`,
+        label: "Other",
+        runId: hidden[0].runId,
+        clusterId: -1,
+        clusterLabel: -1,
+        size: otherSize,
+        depth,
+        meta: {
+            nameShort: `Other (${hidden.length})`,
+            displayName: `Other (${hidden.length})`,
+        },
+        inbound: otherInbound,
+        outbound: otherOutbound,
+        totalFlow: otherFlow,
+        isOther: true,
         };
 
         visible.push(otherNode);
