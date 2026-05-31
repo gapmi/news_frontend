@@ -15,6 +15,7 @@ import type { GraphEdge, GraphNode, GraphResponse } from "@/api/clustering";
 type Props = {
   data: GraphResponse | null;
   selectedEdgeId?: number | null;
+  selectedRunId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
   onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
 };
@@ -33,14 +34,32 @@ function clusterLabel(node: GraphNode) {
   return `C${node.clusterId}`;
 }
 
+const RUN_COLORS = [
+  "#2563eb",
+  "#7c3aed",
+  "#0f766e",
+  "#ea580c",
+  "#dc2626",
+  "#0891b2",
+  "#65a30d",
+  "#c026d3",
+];
+
+function getRunColor(runId: number, runOrder: number[]) {
+  const index = runOrder.indexOf(runId);
+  return RUN_COLORS[index >= 0 ? index % RUN_COLORS.length : 0];
+}
+
 function GraphCanvas({
   data,
   selectedEdgeId,
+  selectedRunId = null,
   onSelectEdge,
   onSelectCluster,
 }: Props) {
   const { nodes, edges } = useMemo(() => {
     const sourceNodes = data?.nodes ?? [];
+    const sourceEdges = data?.edges ?? [];
 
     const runOrder = Array.from(new Set(sourceNodes.map((node) => node.runId))).sort(
       (a, b) => a - b,
@@ -59,19 +78,37 @@ function GraphCanvas({
       bucket.sort((a, b) => a.clusterId - b.clusterId);
     }
 
+    const edgeByNodeId = new Map<string, GraphEdge[]>();
+    for (const edge of sourceEdges) {
+      const sourceBucket = edgeByNodeId.get(edge.source) ?? [];
+      sourceBucket.push(edge);
+      edgeByNodeId.set(edge.source, sourceBucket);
+
+      const targetBucket = edgeByNodeId.get(edge.target) ?? [];
+      targetBucket.push(edge);
+      edgeByNodeId.set(edge.target, targetBucket);
+    }
+
+    const nodeMap = new Map(sourceNodes.map((node) => [node.id, node] as const));
+
     const graphNodes: Node[] = sourceNodes.map((node: GraphNode) => {
       const col = runIndex.get(node.runId) ?? 0;
       const row = (nodesByRun.get(node.runId) ?? []).findIndex(
         (item) => item.id === node.id,
       );
 
-      const isConnectedToSelected =
+      const isConnectedToSelectedEdge =
         selectedEdgeId !== null &&
-        (data?.edges ?? []).some(
+        sourceEdges.some(
           (edge) =>
             edge.edgeId === selectedEdgeId &&
             (edge.source === node.id || edge.target === node.id),
         );
+
+      const isInSelectedRun = selectedRunId !== null && node.runId === selectedRunId;
+
+      const isAdjacentToSelectedRun =
+        selectedRunId !== null && Math.abs(node.runId - selectedRunId) === 1;
 
       return {
         id: node.id,
@@ -89,8 +126,18 @@ function GraphCanvas({
           borderRadius: 16,
           padding: 12,
           width: 190,
-          border: isConnectedToSelected ? "2px solid #0f172a" : "1px solid #cbd5e1",
-          background: isConnectedToSelected ? "#e2e8f0" : "#ffffff",
+          border: isConnectedToSelectedEdge
+            ? "2px solid #0f172a"
+            : isInSelectedRun
+              ? `1.5px solid ${getRunColor(node.runId, runOrder)}`
+              : "1px solid #cbd5e1",
+          background: isConnectedToSelectedEdge
+            ? "#e2e8f0"
+            : isInSelectedRun
+              ? "#eff6ff"
+              : isAdjacentToSelectedRun
+                ? "#faf5ff"
+                : "#ffffff",
           fontSize: 12,
           lineHeight: 1.35,
           whiteSpace: "pre-line",
@@ -100,30 +147,85 @@ function GraphCanvas({
       };
     });
 
-    const graphEdges: Edge[] = (data?.edges ?? []).map((edge: GraphEdge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
-      animated: selectedEdgeId === edge.edgeId,
-      style: {
-        stroke: selectedEdgeId === edge.edgeId ? "#0f172a" : "#94a3b8",
-        strokeWidth:
-          selectedEdgeId === edge.edgeId
+    const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
+      const sourceNode = nodeMap.get(edge.source);
+      const targetNode = nodeMap.get(edge.target);
+
+      const sourceRunId = sourceNode?.runId ?? null;
+      const targetRunId = targetNode?.runId ?? null;
+
+      const isSelected = selectedEdgeId === edge.edgeId;
+
+      const touchesSelectedRun =
+        selectedRunId !== null &&
+        (sourceRunId === selectedRunId || targetRunId === selectedRunId);
+
+      const sourceColor =
+        sourceRunId !== null ? getRunColor(sourceRunId, runOrder) : "#94a3b8";
+      const targetColor =
+        targetRunId !== null ? getRunColor(targetRunId, runOrder) : "#94a3b8";
+
+      let stroke = "#94a3b8";
+      let opacity = 0.55;
+      let markerColor = "#94a3b8";
+
+      if (selectedRunId === null) {
+        stroke = sourceColor;
+        markerColor = sourceColor;
+        opacity = 0.55;
+      } else if (touchesSelectedRun) {
+        if (sourceRunId === selectedRunId && targetRunId !== selectedRunId) {
+          stroke = sourceColor;
+          markerColor = sourceColor;
+        } else if (targetRunId === selectedRunId && sourceRunId !== selectedRunId) {
+          stroke = targetColor;
+          markerColor = targetColor;
+        } else {
+          stroke = getRunColor(selectedRunId, runOrder);
+          markerColor = stroke;
+        }
+        opacity = 0.92;
+      } else {
+        stroke = "#cbd5e1";
+        markerColor = "#cbd5e1";
+        opacity = 0.22;
+      }
+
+      if (isSelected) {
+        stroke = "#0f172a";
+        markerColor = "#0f172a";
+        opacity = 1;
+      }
+
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
+        animated: isSelected,
+        style: {
+          stroke,
+          strokeOpacity: opacity,
+          strokeWidth: isSelected
             ? 3.5
             : Math.max(1.5, Math.min(6, edge.overlapCount / 4)),
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: selectedEdgeId === edge.edgeId ? "#0f172a" : "#94a3b8",
-      },
-      data: {
-        edgeId: edge.edgeId,
-      },
-    }));
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: markerColor,
+        },
+        labelStyle: {
+          fontSize: 11,
+          fill: "#475569",
+        },
+        data: {
+          edgeId: edge.edgeId,
+        },
+      };
+    });
 
     return { nodes: graphNodes, edges: graphEdges };
-  }, [data, selectedEdgeId]);
+  }, [data, selectedEdgeId, selectedRunId]);
 
   if (!data || data.nodes.length === 0) {
     return (
