@@ -165,22 +165,20 @@ export default function LineageDashboard() {
 
   const timelineRunIds = sankeyWindow?.runIds ?? [];
 
-  const sankeyParams = sankeyWindow
+    const sankeyParams = sankeyWindow
     ? {
         start_run_id: sankeyWindow.startRunId,
-        end_run_id: sankeyWindow.endRunId,
+        end_run_id: sankeyWindow.endRunId + 1,
         min_score: minScore,
-      }
+        }
     : null;
 
-  const graphParams = sankeyWindow
+    const graphParams = sankeyWindow
     ? {
         start_run_id: sankeyWindow.startRunId,
-        end_run_id: sankeyWindow.endRunId,
+        end_run_id: sankeyWindow.endRunId + 1,
         min_score: minScore,
-        max_nodes: 180,
-        max_edges: 220,
-      }
+        }
     : null;
 
   const edgeParams =
