@@ -5,6 +5,7 @@ type Props = {
   data: SankeyResponse | null;
   selectedEdgeId?: number | null;
   activeEdgeIds?: Set<number>;
+  focusedRunId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
 };
 
@@ -38,6 +39,18 @@ type LayoutLink = {
   isSynthetic?: boolean;
 };
 
+type ColumnBand = {
+  key: string;
+  runId: number | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  labelX: number;
+  labelY: number;
+  isFocus: boolean;
+};
+
 const SVG_HEIGHT = 760;
 const PADDING_TOP = 84;
 const PADDING_BOTTOM = 52;
@@ -51,6 +64,10 @@ const MAX_NODE_HEIGHT = 88;
 const MIN_STROKE = 2;
 const MAX_STROKE = 18;
 const MAX_NODES_PER_COLUMN = 8;
+
+const BAND_X_PADDING = 20;
+const BAND_Y_PADDING = 16;
+const BAND_RADIUS = 26;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -100,221 +117,261 @@ export default function MultiRunSankey({
   data,
   selectedEdgeId = null,
   activeEdgeIds = new Set<number>(),
+  focusedRunId = null,
   onSelectEdge,
 }: Props) {
-  const { columns, layoutNodes, layoutLinks, maxStrokeValue, minRunId, maxRunId } =
-    useMemo(() => {
-      const nodes = data?.nodes ?? [];
-      const links = data?.links ?? [];
+  const {
+    columns,
+    columnBands,
+    layoutNodes,
+    layoutLinks,
+    maxStrokeValue,
+    minRunId,
+    maxRunId,
+  } = useMemo(() => {
+    const nodes = data?.nodes ?? [];
+    const links = data?.links ?? [];
 
-      const grouped = new Map<number, SankeyNode[]>();
-      for (const node of nodes) {
-        const current = grouped.get(node.depth) ?? [];
-        current.push(node);
-        grouped.set(node.depth, current);
-      }
+    const grouped = new Map<number, SankeyNode[]>();
+    for (const node of nodes) {
+      const current = grouped.get(node.depth) ?? [];
+      current.push(node);
+      grouped.set(node.depth, current);
+    }
 
-      const sortedDepths = [...grouped.keys()].sort((a, b) => a - b);
-      const runIds = [...new Set(nodes.map((node) => node.runId))].sort((a, b) => a - b);
-      const minRunId = runIds[0] ?? null;
-      const maxRunId = runIds[runIds.length - 1] ?? null;
+    const sortedDepths = [...grouped.keys()].sort((a, b) => a - b);
+    const runIds = [...new Set(nodes.map((node) => node.runId))].sort((a, b) => a - b);
+    const minRunId = runIds[0] ?? null;
+    const maxRunId = runIds[runIds.length - 1] ?? null;
 
-      const inboundMap = new Map<string, number>();
-      const outboundMap = new Map<string, number>();
+    const inboundMap = new Map<string, number>();
+    const outboundMap = new Map<string, number>();
 
-      for (const link of links) {
-        inboundMap.set(link.target, (inboundMap.get(link.target) ?? 0) + link.value);
-        outboundMap.set(link.source, (outboundMap.get(link.source) ?? 0) + link.value);
-      }
+    for (const link of links) {
+      inboundMap.set(link.target, (inboundMap.get(link.target) ?? 0) + link.value);
+      outboundMap.set(link.source, (outboundMap.get(link.source) ?? 0) + link.value);
+    }
 
-      const visibleNodeIdMap = new Map<number, Set<string>>();
-      const hiddenNodeIdMap = new Map<number, Set<string>>();
+    const visibleNodeIdMap = new Map<number, Set<string>>();
+    const hiddenNodeIdMap = new Map<number, Set<string>>();
 
-      const preparedColumns: Array<{
-        depth: number;
-        columnIndex: number;
-        runId: number | null;
-        nodes: PreparedNode[];
-      }> = [];
+    const preparedColumns: Array<{
+      depth: number;
+      columnIndex: number;
+      runId: number | null;
+      nodes: PreparedNode[];
+    }> = [];
 
-      for (const [columnIndex, depth] of sortedDepths.entries()) {
-        const sourceNodes = grouped.get(depth) ?? [];
+    for (const [columnIndex, depth] of sortedDepths.entries()) {
+      const sourceNodes = grouped.get(depth) ?? [];
 
-        const prepared: PreparedNode[] = sourceNodes
-          .map((node) => {
-            const inbound = inboundMap.get(node.id) ?? 0;
-            const outbound = outboundMap.get(node.id) ?? 0;
-            const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
+      const prepared: PreparedNode[] = sourceNodes
+        .map((node) => {
+          const inbound = inboundMap.get(node.id) ?? 0;
+          const outbound = outboundMap.get(node.id) ?? 0;
+          const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
 
-            return {
-              ...node,
-              inbound,
-              outbound,
-              totalFlow,
-            };
-          })
-          .sort((a, b) => {
-            if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
-            if (b.size !== a.size) return b.size - a.size;
-            return a.clusterId - b.clusterId;
-          });
-
-        const visible = prepared.slice(0, MAX_NODES_PER_COLUMN);
-        const hidden = prepared.slice(MAX_NODES_PER_COLUMN);
-
-        visibleNodeIdMap.set(depth, new Set(visible.map((node) => node.id)));
-        hiddenNodeIdMap.set(depth, new Set(hidden.map((node) => node.id)));
-
-        if (hidden.length > 0) {
-          const otherNode: PreparedNode = {
-            id: `other-${depth}`,
-            label: "Other",
-            runId: hidden[0].runId,
-            clusterId: -1,
-            clusterLabel: -1,
-            size: hidden.reduce((sum, node) => sum + node.size, 0),
-            depth,
-            meta: {
-              nameShort: `Other (${hidden.length})`,
-            },
-            inbound: hidden.reduce((sum, node) => sum + node.inbound, 0),
-            outbound: hidden.reduce((sum, node) => sum + node.outbound, 0),
-            totalFlow: hidden.reduce((sum, node) => sum + node.totalFlow, 0),
-            isOther: true,
+          return {
+            ...node,
+            inbound,
+            outbound,
+            totalFlow,
           };
-          visible.push(otherNode);
-        }
+        })
+        .sort((a, b) => {
+          if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
+          if (b.size !== a.size) return b.size - a.size;
+          return a.clusterId - b.clusterId;
+        });
 
-        preparedColumns.push({
+      const visible = prepared.slice(0, MAX_NODES_PER_COLUMN);
+      const hidden = prepared.slice(MAX_NODES_PER_COLUMN);
+
+      visibleNodeIdMap.set(depth, new Set(visible.map((node) => node.id)));
+      hiddenNodeIdMap.set(depth, new Set(hidden.map((node) => node.id)));
+
+      if (hidden.length > 0) {
+        const otherNode: PreparedNode = {
+          id: `other-${depth}`,
+          label: "Other",
+          runId: hidden[0].runId,
+          clusterId: -1,
+          clusterLabel: -1,
+          size: hidden.reduce((sum, node) => sum + node.size, 0),
           depth,
-          columnIndex,
-          runId: prepared[0]?.runId ?? null,
-          nodes: visible,
+          meta: {
+            nameShort: `Other (${hidden.length})`,
+          },
+          inbound: hidden.reduce((sum, node) => sum + node.inbound, 0),
+          outbound: hidden.reduce((sum, node) => sum + node.outbound, 0),
+          totalFlow: hidden.reduce((sum, node) => sum + node.totalFlow, 0),
+          isOther: true,
+        };
+        visible.push(otherNode);
+      }
+
+      preparedColumns.push({
+        depth,
+        columnIndex,
+        runId: prepared[0]?.runId ?? null,
+        nodes: visible,
+      });
+    }
+
+    const remappedLinksMap = new Map<
+      string,
+      Omit<LayoutLink, "sourceNode" | "targetNode" | "strokeWidth" | "path">
+    >();
+
+    function mapNodeId(originalNodeId: string, depth: number) {
+      const visibleIds = visibleNodeIdMap.get(depth) ?? new Set<string>();
+      const hiddenIds = hiddenNodeIdMap.get(depth) ?? new Set<string>();
+
+      if (visibleIds.has(originalNodeId)) return originalNodeId;
+      if (hiddenIds.has(originalNodeId)) return `other-${depth}`;
+      return originalNodeId;
+    }
+
+    const nodeMap = new Map(nodes.map((node) => [node.id, node] as const));
+
+    for (const link of links) {
+      const sourceNode = nodeMap.get(link.source);
+      const targetNode = nodeMap.get(link.target);
+      if (!sourceNode || !targetNode) continue;
+
+      const mappedSource = mapNodeId(link.source, sourceNode.depth);
+      const mappedTarget = mapNodeId(link.target, targetNode.depth);
+      const aggregateKey = `${mappedSource}-${mappedTarget}`;
+
+      const existing = remappedLinksMap.get(aggregateKey);
+      if (existing) {
+        existing.value += link.value;
+        existing.score = Math.max(existing.score, link.score);
+        existing.similarity = Math.max(existing.similarity, link.similarity);
+        if (existing.edgeId === null) {
+          existing.edgeId = getNumericEdgeId(link);
+        }
+        existing.isSynthetic =
+          existing.isSynthetic ||
+          mappedSource.startsWith("other-") ||
+          mappedTarget.startsWith("other-");
+      } else {
+        remappedLinksMap.set(aggregateKey, {
+          id: aggregateKey,
+          source: mappedSource,
+          target: mappedTarget,
+          value: link.value,
+          score: link.score,
+          similarity: link.similarity,
+          edgeId: getNumericEdgeId(link),
+          isSynthetic:
+            mappedSource.startsWith("other-") || mappedTarget.startsWith("other-"),
         });
       }
+    }
 
-      const remappedLinksMap = new Map<
-        string,
-        Omit<LayoutLink, "sourceNode" | "targetNode" | "strokeWidth" | "path">
-      >();
+    const allPreparedNodes = preparedColumns.flatMap((column) => column.nodes);
+    const maxNodeFlow = Math.max(...allPreparedNodes.map((node) => node.totalFlow), 1);
 
-      function mapNodeId(originalNodeId: string, depth: number) {
-        const visibleIds = visibleNodeIdMap.get(depth) ?? new Set<string>();
-        const hiddenIds = hiddenNodeIdMap.get(depth) ?? new Set<string>();
+    const layoutNodes: LayoutNode[] = [];
 
-        if (visibleIds.has(originalNodeId)) return originalNodeId;
-        if (hiddenIds.has(originalNodeId)) return `other-${depth}`;
-        return originalNodeId;
-      }
+    for (const column of preparedColumns) {
+      const x = getColumnX(column.columnIndex);
 
-      const nodeMap = new Map(nodes.map((node) => [node.id, node] as const));
-
-      for (const link of links) {
-        const sourceNode = nodeMap.get(link.source);
-        const targetNode = nodeMap.get(link.target);
-        if (!sourceNode || !targetNode) continue;
-
-        const mappedSource = mapNodeId(link.source, sourceNode.depth);
-        const mappedTarget = mapNodeId(link.target, targetNode.depth);
-        const aggregateKey = `${mappedSource}-${mappedTarget}`;
-
-        const existing = remappedLinksMap.get(aggregateKey);
-        if (existing) {
-          existing.value += link.value;
-          existing.score = Math.max(existing.score, link.score);
-          existing.similarity = Math.max(existing.similarity, link.similarity);
-          if (existing.edgeId === null) {
-            existing.edgeId = getNumericEdgeId(link);
-          }
-          existing.isSynthetic =
-            existing.isSynthetic ||
-            mappedSource.startsWith("other-") ||
-            mappedTarget.startsWith("other-");
-        } else {
-          remappedLinksMap.set(aggregateKey, {
-            id: aggregateKey,
-            source: mappedSource,
-            target: mappedTarget,
-            value: link.value,
-            score: link.score,
-            similarity: link.similarity,
-            edgeId: getNumericEdgeId(link),
-            isSynthetic:
-              mappedSource.startsWith("other-") || mappedTarget.startsWith("other-"),
-          });
-        }
-      }
-
-      const allPreparedNodes = preparedColumns.flatMap((column) => column.nodes);
-      const maxNodeFlow = Math.max(...allPreparedNodes.map((node) => node.totalFlow), 1);
-
-      const layoutNodes: LayoutNode[] = [];
-
-      for (const column of preparedColumns) {
-        const x = getColumnX(column.columnIndex);
-
-        const heights = column.nodes.map((node) =>
-          clamp((node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT),
-        );
-
-        const totalHeight =
-          heights.reduce((sum, height) => sum + height, 0) +
-          Math.max(0, column.nodes.length - 1) * NODE_GAP;
-
-        const availableHeight = SVG_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
-        let currentY = PADDING_TOP + Math.max(0, (availableHeight - totalHeight) / 2);
-
-        for (let i = 0; i < column.nodes.length; i += 1) {
-          const node = column.nodes[i];
-          const height = heights[i];
-
-          layoutNodes.push({
-            ...node,
-            x,
-            y: currentY,
-            width: COLUMN_NODE_WIDTH,
-            height,
-            columnIndex: column.columnIndex,
-          });
-
-          currentY += height + NODE_GAP;
-        }
-      }
-
-      const layoutNodeMap = new Map(layoutNodes.map((node) => [node.id, node] as const));
-
-      const remappedLinks = [...remappedLinksMap.values()].filter(
-        (link) => layoutNodeMap.has(link.source) && layoutNodeMap.has(link.target),
+      const heights = column.nodes.map((node) =>
+        clamp((node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT),
       );
 
-      const maxStrokeValue = Math.max(...remappedLinks.map((link) => link.value), 1);
+      const totalHeight =
+        heights.reduce((sum, height) => sum + height, 0) +
+        Math.max(0, column.nodes.length - 1) * NODE_GAP;
 
-      const layoutLinks: LayoutLink[] = remappedLinks.map((link) => {
-        const sourceNode = layoutNodeMap.get(link.source)!;
-        const targetNode = layoutNodeMap.get(link.target)!;
+      const availableHeight = SVG_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
+      let currentY = PADDING_TOP + Math.max(0, (availableHeight - totalHeight) / 2);
 
-        return {
-          ...link,
-          sourceNode,
-          targetNode,
-          strokeWidth: clamp(
-            (link.value / maxStrokeValue) * MAX_STROKE,
-            MIN_STROKE,
-            MAX_STROKE,
-          ),
-          path: buildLinkPath(sourceNode, targetNode),
-        };
-      });
+      for (let i = 0; i < column.nodes.length; i += 1) {
+        const node = column.nodes[i];
+        const height = heights[i];
+
+        layoutNodes.push({
+          ...node,
+          x,
+          y: currentY,
+          width: COLUMN_NODE_WIDTH,
+          height,
+          columnIndex: column.columnIndex,
+        });
+
+        currentY += height + NODE_GAP;
+      }
+    }
+
+    const layoutNodeMap = new Map(layoutNodes.map((node) => [node.id, node] as const));
+
+    const remappedLinks = [...remappedLinksMap.values()].filter(
+      (link) => layoutNodeMap.has(link.source) && layoutNodeMap.has(link.target),
+    );
+
+    const maxStrokeValue = Math.max(...remappedLinks.map((link) => link.value), 1);
+
+    const layoutLinks: LayoutLink[] = remappedLinks.map((link) => {
+      const sourceNode = layoutNodeMap.get(link.source)!;
+      const targetNode = layoutNodeMap.get(link.target)!;
 
       return {
-        columns: preparedColumns,
-        layoutNodes,
-        layoutLinks,
-        maxStrokeValue,
-        minRunId,
-        maxRunId,
+        ...link,
+        sourceNode,
+        targetNode,
+        strokeWidth: clamp(
+          (link.value / maxStrokeValue) * MAX_STROKE,
+          MIN_STROKE,
+          MAX_STROKE,
+        ),
+        path: buildLinkPath(sourceNode, targetNode),
       };
-    }, [data]);
+    });
+
+    const columnBands: ColumnBand[] = preparedColumns
+      .map((column) => {
+        const columnNodes = layoutNodes.filter(
+          (node) => node.columnIndex === column.columnIndex,
+        );
+
+        if (columnNodes.length === 0) return null;
+
+        const top = Math.min(...columnNodes.map((node) => node.y)) - BAND_Y_PADDING;
+        const bottom =
+          Math.max(...columnNodes.map((node) => node.y + node.height)) + BAND_Y_PADDING;
+
+        const x = getColumnX(column.columnIndex) - BAND_X_PADDING;
+        const width = COLUMN_NODE_WIDTH + BAND_X_PADDING * 2;
+        const y = top;
+        const height = bottom - top;
+
+        return {
+          key: `band-${column.depth}`,
+          runId: column.runId,
+          x,
+          y,
+          width,
+          height,
+          labelX: x + width / 2,
+          labelY: Math.max(40, y - 10),
+          isFocus: column.runId !== null && focusedRunId !== null && column.runId === focusedRunId,
+        };
+      })
+      .filter(Boolean) as ColumnBand[];
+
+    return {
+      columns: preparedColumns,
+      columnBands,
+      layoutNodes,
+      layoutLinks,
+      maxStrokeValue,
+      minRunId,
+      maxRunId,
+    };
+  }, [data, focusedRunId]);
 
   if (!data || !data.nodes.length) {
     return (
@@ -367,17 +424,29 @@ export default function MultiRunSankey({
             </linearGradient>
           </defs>
 
-          {columns.map((column) => (
-            <g key={`col-${column.depth}`}>
+          {columnBands.map((band) => (
+            <g key={band.key}>
+              <rect
+                x={band.x}
+                y={band.y}
+                width={band.width}
+                height={band.height}
+                rx={BAND_RADIUS}
+                fill={band.isFocus ? "#fef3c7" : "#f5f3ff"}
+                fillOpacity={band.isFocus ? 0.7 : 0.4}
+                stroke={band.isFocus ? "#f59e0b" : "#c4b5fd"}
+                strokeOpacity={band.isFocus ? 0.55 : 0.32}
+                strokeWidth={band.isFocus ? 1.4 : 1}
+              />
               <text
-                x={getColumnX(column.columnIndex) + COLUMN_NODE_WIDTH / 2}
-                y={42}
+                x={band.labelX}
+                y={band.labelY}
                 textAnchor="middle"
-                fontSize="14"
+                fontSize="12"
                 fontWeight="600"
-                fill="#52525b"
+                fill={band.isFocus ? "#92400e" : "#6d28d9"}
               >
-                {`Run ${column.runId ?? "—"}`}
+                {`Run ${band.runId ?? "—"}`}
               </text>
             </g>
           ))}
@@ -439,6 +508,9 @@ ${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
                   (link.sourceNode.id === node.id || link.targetNode.id === node.id),
               );
 
+            const isFocusedRun =
+              focusedRunId !== null && node.runId === focusedRunId;
+
             return (
               <g key={node.id}>
                 <rect
@@ -447,8 +519,24 @@ ${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
                   width={node.width}
                   height={node.height}
                   rx={10}
-                  fill={node.isOther ? "#eef2f7" : hasSelectedConnection ? "#e2e8f0" : "#f3f4f6"}
-                  stroke={node.isOther ? "#cbd5e1" : hasSelectedConnection ? "#94a3b8" : "#d1d5db"}
+                  fill={
+                    node.isOther
+                      ? "#eef2f7"
+                      : hasSelectedConnection
+                        ? "#e2e8f0"
+                        : isFocusedRun
+                          ? "#fffbeb"
+                          : "#f3f4f6"
+                  }
+                  stroke={
+                    node.isOther
+                      ? "#cbd5e1"
+                      : hasSelectedConnection
+                        ? "#94a3b8"
+                        : isFocusedRun
+                          ? "#f59e0b"
+                          : "#d1d5db"
+                  }
                 />
                 <text
                   x={node.x + 10}
@@ -483,10 +571,16 @@ ${node.isOther ? "Aggregated remainder" : ""}`}
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
         <div className="rounded-md border bg-background px-3 py-2">
-          Thickest band <span className="font-medium text-foreground">{formatNumber(maxStrokeValue, 0)}</span>
+          Thickest band{" "}
+          <span className="font-medium text-foreground">{formatNumber(maxStrokeValue, 0)}</span>
         </div>
         <div className="rounded-md border bg-background px-3 py-2">
-          Selected edge <span className="font-medium text-foreground">{selectedEdgeId ?? "—"}</span>
+          Selected edge{" "}
+          <span className="font-medium text-foreground">{selectedEdgeId ?? "—"}</span>
+        </div>
+        <div className="rounded-md border bg-background px-3 py-2">
+          Focused run{" "}
+          <span className="font-medium text-foreground">{focusedRunId ?? "—"}</span>
         </div>
       </div>
     </section>
