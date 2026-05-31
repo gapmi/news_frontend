@@ -1,40 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+
 import {
   clusteringKeys,
-  getClusterDetail,
   getClusteringRuns,
   getEulerPairDetail,
   getGraphView,
   getLineageEdges,
-  getPipelineRuns,
   getSankeyView,
+  type LineageEdge,
 } from "@/api/clustering";
-import LineageEdgesSection from "@/components/lineage/LineageEdgesSection";
-import LineageContextPanel from "@/components/lineage/LineageContextPanel";
-import LineageControlsSection from "@/components/lineage/LineageControlsSection";
-import ClusterArticlesDrawer from "@/components/lineage/ClusterArticlesDrawer";
-import EulerDetailModal from "@/components/lineage/EulerDetailModal";
-import MultiRunSankey from "@/components/charts/MultiRunSankey";
-import LineageFlow from "@/components/charts/LineageFlow";
-import LineagePageShell from "@/components/lineage/page/LineagePageShell";
-import AnalyticsSection from "@/components/lineage/page/AnalyticsSection";
-import DashboardPageHeader from "@/components/lineage/page/DashboardPageHeader";
-import SectionState from "@/components/lineage/page/SectionState";
+
 import { getLineageWindow } from "@/utils/lineageWindow";
 
-interface RunPair {
-  parentRunId: number;
-  childRunId: number;
-}
-
-interface SelectedClusterState {
-  runId: number;
-  clusterId: number;
-  label?: string | null;
-}
-
-function formatDateTime(value: string | null) {
+function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
 }
@@ -43,67 +22,23 @@ function formatNumber(value: number, digits = 2) {
   return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
-function MetricCard({
-  label,
-  value,
-  meta,
-}: {
-  label: string;
-  value: string | number;
-  meta: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-4">
-      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 text-xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-xs leading-5 text-muted-foreground">{meta}</div>
-    </div>
-  );
-}
-
-function SectionMetaChip({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">
-      <span className="font-medium text-foreground">{label}:</span>{" "}
-      <span>{value}</span>
-    </div>
-  );
+interface RunPair {
+  parentRunId: number;
+  childRunId: number;
 }
 
 export default function LineageDashboard() {
+  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
+  const [minScore, setMinScore] = useState(0);
   const [manualParentRunId, setManualParentRunId] = useState<number | null>(null);
   const [manualChildRunId, setManualChildRunId] = useState<number | null>(null);
-  const [minScore, setMinScore] = useState(0);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
-  const [tagLanguage, setTagLanguage] = useState<"RU" | "EN">("RU");
-  const [selectedCluster, setSelectedCluster] = useState<SelectedClusterState | null>(null);
 
   const runsQuery = useQuery({
-    queryKey: clusteringKeys.runs({ status: "success", limit: 20 }),
-    queryFn: () => getClusteringRuns({ status: "success", limit: 20 }),
-  });
-
-  const pipelineRunsQuery = useQuery({
-    queryKey: clusteringKeys.pipelineRuns({ job_type: "pipeline", limit: 5 }),
-    queryFn: () => getPipelineRuns({ job_type: "pipeline", limit: 5 }),
+    queryKey: clusteringKeys.runs({ status: "success", limit: 10 }),
+    queryFn: () => getClusteringRuns({ status: "success", limit: 10 }),
   });
 
   const runs = runsQuery.data?.items ?? [];
-  const pipelineRuns = pipelineRunsQuery.data?.items ?? [];
-  const latestRun = runs[0] ?? null;
-  const latestPipelineRun = pipelineRuns[0] ?? null;
-
-  function handleSelectCluster(runId: number, clusterId: number, label?: string | null) {
-    setSelectedCluster({ runId, clusterId, label: label ?? null });
-  }
 
   const lineageRuns = useMemo(() => {
     return runs.filter(
@@ -118,13 +53,21 @@ export default function LineageDashboard() {
   const availablePairs = useMemo<RunPair[]>(() => {
     if (sortedLineageRunIds.length < 2) return [];
 
-    return sortedLineageRunIds.slice(0, -1).map((parentRunId, index) => ({
-      parentRunId,
-      childRunId: sortedLineageRunIds[index + 1],
-    }));
+    return sortedLineageRunIds
+      .slice(0, -1)
+      .map((parentRunId, index) => ({
+        parentRunId,
+        childRunId: sortedLineageRunIds[index + 1],
+      }))
+      .filter((pair) => pair.parentRunId !== pair.childRunId);
   }, [sortedLineageRunIds]);
 
   const defaultPair = availablePairs[0] ?? null;
+
+  const parentOptions = useMemo(() => {
+    return [...new Set(availablePairs.map((pair) => pair.parentRunId))];
+  }, [availablePairs]);
+
   const parentRunId = manualParentRunId ?? defaultPair?.parentRunId ?? null;
 
   const childOptions = useMemo(() => {
@@ -138,10 +81,24 @@ export default function LineageDashboard() {
     if (manualChildRunId !== null && childOptions.includes(manualChildRunId)) {
       return manualChildRunId;
     }
+
+    const defaultChild = availablePairs.find(
+      (pair) => pair.parentRunId === parentRunId,
+    )?.childRunId;
+
+    if (defaultChild !== undefined && childOptions.includes(defaultChild)) {
+      return defaultChild;
+    }
+
     return childOptions[0] ?? null;
-  }, [manualChildRunId, childOptions]);
+  }, [manualChildRunId, childOptions, availablePairs, parentRunId]);
 
   useEffect(() => {
+    if (parentRunId === null) {
+      setManualChildRunId(null);
+      return;
+    }
+
     if (childOptions.length === 0) {
       setManualChildRunId(null);
       return;
@@ -150,18 +107,24 @@ export default function LineageDashboard() {
     if (childRunId === null || !childOptions.includes(childRunId)) {
       setManualChildRunId(childOptions[0]);
     }
-  }, [childOptions, childRunId]);
+  }, [parentRunId, childOptions, childRunId]);
 
-  useEffect(() => {
-    setSelectedCluster(null);
-  }, [parentRunId, childRunId, minScore]);
+  const childRunHelperText = useMemo(() => {
+    if (parentRunId === null) {
+      return "Choose a parent run to see valid child runs.";
+    }
+
+    if (childOptions.length === 0) {
+      return `No valid child runs for parent ${parentRunId}.`;
+    }
+
+    return `Available for parent ${parentRunId}: ${childOptions.join(", ")}`;
+  }, [parentRunId, childOptions]);
 
   const sankeyWindow = useMemo(() => {
     if (parentRunId === null) return null;
     return getLineageWindow(sortedLineageRunIds, parentRunId, 5);
   }, [sortedLineageRunIds, parentRunId]);
-
-  const timelineRunIds = sankeyWindow?.runIds ?? [];
 
   const sankeyParams = sankeyWindow
     ? {
@@ -176,20 +139,16 @@ export default function LineageDashboard() {
         start_run_id: sankeyWindow.startRunId,
         end_run_id: sankeyWindow.endRunId,
         min_score: minScore,
-        max_nodes: 180,
-        max_edges: 220,
       }
     : null;
 
   const edgeParams =
-    parentRunId !== null &&
-    childRunId !== null &&
-    parentRunId < childRunId
+    parentRunId !== null && childRunId !== null && parentRunId !== childRunId
       ? {
           parent_run_id: parentRunId,
           child_run_id: childRunId,
           min_score: minScore,
-          limit: 50,
+          limit: 20,
         }
       : null;
 
@@ -214,7 +173,7 @@ export default function LineageDashboard() {
   const edgesQuery = useQuery({
     queryKey: edgeParams
       ? clusteringKeys.lineageEdges(edgeParams)
-      : clusteringKeys.lineageEdges({ limit: 50 }),
+      : clusteringKeys.lineageEdges({ limit: 20 }),
     queryFn: () => getLineageEdges(edgeParams!),
     enabled: Boolean(edgeParams),
     placeholderData: keepPreviousData,
@@ -228,260 +187,282 @@ export default function LineageDashboard() {
     enabled: selectedEdgeId !== null,
   });
 
-  const clusterDetailQuery = useQuery({
-    queryKey: selectedCluster
-      ? clusteringKeys.cluster(selectedCluster.clusterId, {
-          include_articles: true,
-          articles_limit: 100,
-        })
-      : clusteringKeys.cluster(0, {
-          include_articles: true,
-          articles_limit: 100,
-        }),
-    queryFn: () =>
-      getClusterDetail(selectedCluster!.clusterId, {
-        include_articles: true,
-        articles_limit: 100,
-      }),
-    enabled: selectedCluster !== null,
-  });
-
   const edges = edgesQuery.data?.items ?? [];
-  const selectedEdge = useMemo(
-    () => edges.find((edge) => edge.edgeId === selectedEdgeId) ?? null,
-    [edges, selectedEdgeId],
-  );
-
-  const totalVisibleLineageEdges = useMemo(() => {
-    return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
-  }, [runs]);
-
-  const pageTitle =
-    latestRun?.clusterCount
-      ? "Cluster lineage analysis"
-      : "Lineage overview";
-
-  const pageSubtitle =
-    latestPipelineRun?.status
-      ? `Latest pipeline run: ${latestPipelineRun.status}. Last start: ${formatDateTime(
-          latestPipelineRun.startedAt,
-        )}.`
-      : "Track storyline flow across adjacent lineage runs and inspect overlap on demand.";
-
-  const clusterLabelByRef = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const node of graphQuery.data?.nodes ?? []) {
-      const label =
-        (typeof node.meta?.nameShort === "string" && node.meta.nameShort.trim()) ||
-        (typeof node.label === "string" && node.label.trim()) ||
-        "";
-
-      map.set(`${node.runId}:${node.clusterId}`, label);
-    }
-
-    return map;
-  }, [graphQuery.data]);
-
-  function getClusterTag(runId: number, clusterId: number) {
-    return clusterLabelByRef.get(`${runId}:${clusterId}`) ?? "";
-  }
-
-  function formatClusterTitle(clusterId: number, tag: string) {
-    return tag ? `${tag} · C${clusterId}` : `C${clusterId}`;
-  }
 
   return (
-    <>
-      <LineagePageShell>
-        <DashboardPageHeader
-          title={pageTitle}
-          subtitle={pageSubtitle}
-          parentRunId={parentRunId}
-          childRunId={childRunId}
-          windowStartRunId={sankeyWindow?.startRunId ?? null}
-          windowEndRunId={sankeyWindow?.endRunId ?? null}
-          pipelineStatus={latestPipelineRun?.status ?? null}
-        />
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8 border-b pb-4">
+          <h1 className="text-3xl font-semibold tracking-tight">Cluster Lineage</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Backend API smoke test for runs, Sankey, graph, lineage edges, and Euler
+            detail.
+          </p>
+        </div>
 
-        <LineageControlsSection
-          minScore={minScore}
-          onChangeMinScore={(value) => {
-            setMinScore(value);
-            setSelectedEdgeId(null);
-            setSelectedCluster(null);
-          }}
-          timelineRunIds={timelineRunIds}
-          parentRunId={parentRunId}
-          onSelectRun={(runId) => {
-            const nextChildOptions = availablePairs
-              .filter((pair) => pair.parentRunId === runId)
-              .map((pair) => pair.childRunId);
+        <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+          <h2 className="mb-4 text-lg font-medium">Controls</h2>
 
-            setManualParentRunId(runId);
-            setManualChildRunId(nextChildOptions[0] ?? null);
-            setSelectedEdgeId(null);
-            setSelectedCluster(null);
-          }}
-        />
+          <div className="grid gap-4 md:grid-cols-4">
+            <label className="flex flex-col gap-2 text-sm">
+              Parent run
+              <select
+                className="rounded-md border bg-background px-3 py-2"
+                value={parentRunId ?? ""}
+                onChange={(event) => {
+                  const nextParentRunId = Number(event.target.value);
+                  const nextChildOptions = availablePairs
+                    .filter((pair) => pair.parentRunId === nextParentRunId)
+                    .map((pair) => pair.childRunId);
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
-          <div className="space-y-6">
-            <AnalyticsSection
-              title="Lineage flow"
-              description="Multi-run overview of lineage transitions across the active window."
-              actions={
-                <div className="flex flex-wrap items-center gap-2">
-                  <SectionMetaChip
-                    label="Window"
-                    value={
-                      sankeyWindow
-                        ? `${sankeyWindow.startRunId} → ${sankeyWindow.endRunId}`
-                        : "—"
-                    }
-                  />
-                  <SectionMetaChip
-                    label="Min score"
-                    value={formatNumber(minScore)}
-                  />
-                  <SectionMetaChip
-                    label="Selected edge"
-                    value={selectedEdge ? `#${selectedEdge.edgeId}` : "None"}
-                  />
+                  setManualParentRunId(nextParentRunId);
+                  setManualChildRunId(nextChildOptions[0] ?? null);
+                  setSelectedEdgeId(null);
+                }}
+              >
+                {parentOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm">
+              Child run
+              <select
+                className="rounded-md border bg-background px-3 py-2"
+                value={childRunId ?? ""}
+                onChange={(event) => {
+                  setManualChildRunId(Number(event.target.value));
+                  setSelectedEdgeId(null);
+                }}
+                disabled={childOptions.length === 0}
+                aria-describedby="child-run-helper"
+              >
+                {childOptions.map((runId) => (
+                  <option key={runId} value={runId}>
+                    Run {runId}
+                  </option>
+                ))}
+              </select>
+              <span
+                id="child-run-helper"
+                className="text-xs text-muted-foreground"
+              >
+                {childRunHelperText}
+              </span>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm">
+              Min score
+              <input
+                className="rounded-md border bg-background px-3 py-2"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={minScore}
+                onChange={(event) => {
+                  setMinScore(Number(event.target.value));
+                  setSelectedEdgeId(null);
+                }}
+              />
+            </label>
+
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {parentRunId !== null ? (
+                <div className="space-y-1">
+                  <div>Anchor run: {parentRunId}</div>
+                  <div>
+                    Pair: {parentRunId ?? "—"} → {childRunId ?? "—"}
+                  </div>
+                  <div>
+                    Sankey window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                    {sankeyWindow?.endRunId ?? "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Runs in window: {sankeyWindow?.runIds.length ?? 0}
+                  </div>
                 </div>
-              }
-            >
-              {!sankeyParams ? (
-                <SectionState kind="empty" title="No lineage window selected" />
-              ) : sankeyQuery.isLoading && !sankeyQuery.data ? (
-                <SectionState kind="loading" title="Loading Sankey data" />
-              ) : sankeyQuery.error ? (
-                <SectionState
-                  kind="error"
-                  title="Failed to load Sankey"
-                  message={(sankeyQuery.error as Error).message}
-                />
-              ) : sankeyQuery.data ? (
-                <MultiRunSankey
-                  data={sankeyQuery.data}
-                  selectedEdgeId={selectedEdgeId}
-                  onSelectEdge={setSelectedEdgeId}
-                  onSelectCluster={handleSelectCluster}
-                />
               ) : (
-                <SectionState kind="empty" title="No Sankey data available" />
+                <div>No lineage pair available.</div>
               )}
-            </AnalyticsSection>
-
-            <AnalyticsSection
-              title="Semantic map"
-              description="Preserved cluster topology workspace for cluster and edge exploration."
-              actions={
-                <div className="flex flex-wrap items-center gap-2">
-                  <SectionMetaChip
-                    label="Anchor"
-                    value={parentRunId !== null ? String(parentRunId) : "—"}
-                  />
-                  <SectionMetaChip
-                    label="Pair"
-                    value={
-                      parentRunId !== null && childRunId !== null
-                        ? `${parentRunId} → ${childRunId}`
-                        : "—"
-                    }
-                  />
-                  <SectionMetaChip
-                    label="Cluster focus"
-                    value={selectedCluster ? `C${selectedCluster.clusterId}` : "None"}
-                  />
-                </div>
-              }
-            >
-              {!graphParams ? (
-                <SectionState kind="empty" title="No graph window selected" />
-              ) : graphQuery.isLoading && !graphQuery.data ? (
-                <SectionState kind="loading" title="Loading semantic graph" />
-              ) : graphQuery.error ? (
-                <SectionState
-                  kind="error"
-                  title="Failed to load semantic graph"
-                  message={(graphQuery.error as Error).message}
-                />
-              ) : graphQuery.data ? (
-                <LineageFlow
-                  data={graphQuery.data}
-                  selectedEdgeId={selectedEdgeId}
-                  onSelectEdge={setSelectedEdgeId}
-                  onSelectCluster={handleSelectCluster}
-                />
-              ) : (
-                <SectionState kind="empty" title="No graph data available" />
-              )}
-            </AnalyticsSection>
-
-            <LineageEdgesSection
-              edges={edges}
-              isLoading={edgesQuery.isLoading}
-              error={edgesQuery.error ? (edgesQuery.error as Error).message : null}
-              selectedEdgeId={selectedEdgeId}
-              onSelectEdge={setSelectedEdgeId}
-              parentRunId={parentRunId}
-              childRunId={childRunId}
-              getClusterTag={getClusterTag}
-              formatClusterTitle={formatClusterTitle}
-              formatNumber={formatNumber}
-            />
-
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="Runs"
-                value={runs.length}
-                meta={`Latest run: ${latestRun?.runId ?? "—"}`}
-              />
-              <MetricCard
-                label="Clusters"
-                value={latestRun?.clusterCount ?? "—"}
-                meta={`Noise: ${latestRun?.noiseCount ?? "—"}`}
-              />
-              <MetricCard
-                label="Lineage edges"
-                value={totalVisibleLineageEdges}
-                meta={`Window size: ${timelineRunIds.length}`}
-              />
-              <MetricCard
-                label="Pipeline"
-                value={latestPipelineRun?.status ?? "—"}
-                meta={formatDateTime(latestPipelineRun?.startedAt ?? null)}
-              />
-            </section>
-          </div>
-
-          <div className="space-y-6">
-            <LineageContextPanel
-              tagLanguage={tagLanguage}
-              onChangeTagLanguage={setTagLanguage}
-              selectedCluster={selectedCluster}
-              selectedEdge={selectedEdge}
-              formatNumber={formatNumber}
-            />
+            </div>
           </div>
         </section>
 
-        <EulerDetailModal
-          open={selectedEdge !== null && eulerQuery.data !== undefined}
-          detail={eulerQuery.data ?? null}
-          onClose={() => setSelectedEdgeId(null)}
-        />
-      </LineagePageShell>
+        <section className="mb-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-lg font-medium">Sankey</h2>
+            {sankeyQuery.isLoading && <p className="mt-2 text-sm">Loading...</p>}
+            {sankeyQuery.error && (
+              <p className="mt-2 text-sm text-red-600">
+                {(sankeyQuery.error as Error).message}
+              </p>
+            )}
+            {sankeyQuery.data && (
+              <dl className="mt-3 space-y-1 text-sm">
+                <div>Nodes: {sankeyQuery.data.stats.nodeCount}</div>
+                <div>Links: {sankeyQuery.data.stats.linkCount}</div>
+                <div>Runs: {sankeyQuery.data.stats.runCount}</div>
+                <div>
+                  Window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                  {sankeyWindow?.endRunId ?? "—"}
+                </div>
+              </dl>
+            )}
+          </div>
 
-      <ClusterArticlesDrawer
-        open={selectedCluster !== null}
-        selectedCluster={selectedCluster}
-        detail={clusterDetailQuery.data ?? null}
-        isLoading={clusterDetailQuery.isLoading}
-        error={clusterDetailQuery.error ? (clusterDetailQuery.error as Error).message : null}
-        onClose={() => setSelectedCluster(null)}
-      />
-    </>
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-lg font-medium">Graph</h2>
+            {graphQuery.isLoading && <p className="mt-2 text-sm">Loading...</p>}
+            {graphQuery.error && (
+              <p className="mt-2 text-sm text-red-600">
+                {(graphQuery.error as Error).message}
+              </p>
+            )}
+            {graphQuery.data && (
+              <dl className="mt-3 space-y-1 text-sm">
+                <div>Nodes: {graphQuery.data.stats.nodeCount}</div>
+                <div>Edges: {graphQuery.data.stats.edgeCount}</div>
+                <div>Groups: {graphQuery.data.groups.length}</div>
+                <div>
+                  Window: {sankeyWindow?.startRunId ?? "—"} →{" "}
+                  {sankeyWindow?.endRunId ?? "—"}
+                </div>
+              </dl>
+            )}
+          </div>
+
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-lg font-medium">Runs</h2>
+            {runsQuery.isLoading && <p className="mt-2 text-sm">Loading...</p>}
+            {runsQuery.data && (
+              <dl className="mt-3 space-y-1 text-sm">
+                <div>Total loaded: {runs.length}</div>
+                <div>Latest run: {runs[0]?.runId ?? "—"}</div>
+                <div>First with lineage: {sortedLineageRunIds[0] ?? "—"}</div>
+                <div>
+                  Last with lineage:{" "}
+                  {sortedLineageRunIds[sortedLineageRunIds.length - 1] ?? "—"}
+                </div>
+                <div>Anchor updated window around selected parent run.</div>
+                <div>Latest started: {formatDate(runs[0]?.startedAt ?? null)}</div>
+              </dl>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+          <h2 className="mb-4 text-lg font-medium">Lineage edges</h2>
+
+          {edgesQuery.isLoading && <p className="text-sm">Loading edges...</p>}
+
+          {edgesQuery.error && (
+            <p className="text-sm text-red-600">
+              {(edgesQuery.error as Error).message}
+            </p>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-2 pr-4">Edge</th>
+                  <th className="py-2 pr-4">Parent</th>
+                  <th className="py-2 pr-4">Child</th>
+                  <th className="py-2 pr-4">Score</th>
+                  <th className="py-2 pr-4">Similarity</th>
+                  <th className="py-2 pr-4">Overlap</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edges.map((edge: LineageEdge) => (
+                  <tr
+                    key={edge.edgeId}
+                    className="cursor-pointer border-b hover:bg-muted/50"
+                    onClick={() => setSelectedEdgeId(edge.edgeId)}
+                  >
+                    <td className="py-2 pr-4">{edge.edgeId}</td>
+                    <td className="py-2 pr-4">
+                      Run {edge.parentRunId} · Cluster {edge.parentClusterId}
+                    </td>
+                    <td className="py-2 pr-4">
+                      Run {edge.childRunId} · Cluster {edge.childClusterId}
+                    </td>
+                    <td className="py-2 pr-4">{formatNumber(edge.score)}</td>
+                    <td className="py-2 pr-4">
+                      {formatNumber(edge.centroidSimilarity)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {edge.articleOverlapCount} /{" "}
+                      {formatNumber(edge.articleOverlapRatio)}
+                    </td>
+                  </tr>
+                ))}
+
+                {edges.length === 0 && !edgesQuery.isLoading && (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-sm text-muted-foreground">
+                      No lineage edges found for the selected pair.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="rounded-lg border bg-card p-4 shadow-sm">
+          <h2 className="mb-4 text-lg font-medium">Euler detail</h2>
+
+          {!selectedEdgeId && (
+            <p className="text-sm text-muted-foreground">
+              Click a lineage edge to load pair detail.
+            </p>
+          )}
+
+          {eulerQuery.isLoading && <p className="text-sm">Loading detail...</p>}
+
+          {eulerQuery.error && (
+            <p className="text-sm text-red-600">
+              {(eulerQuery.error as Error).message}
+            </p>
+          )}
+
+          {eulerQuery.data && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <h3 className="font-medium">{eulerQuery.data.labels.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {eulerQuery.data.labels.subtitle}
+                </p>
+                <p className="mt-3 text-sm">
+                  {eulerQuery.data.labels.explanation}
+                </p>
+              </div>
+
+              <div>
+                <dl className="space-y-1 text-sm">
+                  <div>Parent size: {eulerQuery.data.parent.size}</div>
+                  <div>Child size: {eulerQuery.data.child.size}</div>
+                  <div>Overlap: {eulerQuery.data.overlap.count}</div>
+                  <div>
+                    Parent coverage:{" "}
+                    {formatNumber(eulerQuery.data.overlap.parentCoverage)}
+                  </div>
+                  <div>
+                    Child coverage:{" "}
+                    {formatNumber(eulerQuery.data.overlap.childCoverage)}
+                  </div>
+                  <div>Jaccard: {formatNumber(eulerQuery.data.overlap.jaccard)}</div>
+                </dl>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
   );
 }

@@ -4,8 +4,8 @@ import type { SankeyLink, SankeyNode, SankeyResponse } from "@/api/clustering";
 type Props = {
   data: SankeyResponse;
   selectedEdgeId?: number | null;
+  activeRunId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
-  onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
 };
 
 type PreparedNode = SankeyNode & {
@@ -41,10 +41,10 @@ type LayoutLink = {
 const SVG_HEIGHT = 760;
 const PADDING_TOP = 84;
 const PADDING_BOTTOM = 52;
-const COLUMN_GAP = 220;
 const PADDING_LEFT = 72;
 const PADDING_RIGHT = 72;
 const COLUMN_NODE_WIDTH = 136;
+const COLUMN_GAP = 220;
 const NODE_GAP = 14;
 const MIN_NODE_HEIGHT = 24;
 const MAX_NODE_HEIGHT = 88;
@@ -64,11 +64,9 @@ function getNodeLabel(node: SankeyNode) {
   if (node.meta?.nameShort && node.meta.nameShort.trim().length > 0) {
     return node.meta.nameShort;
   }
-
   if (node.label && node.label.trim().length > 0) {
     return node.label;
   }
-
   return `Cluster ${node.clusterId}`;
 }
 
@@ -88,32 +86,22 @@ function buildLinkPath(sourceNode: LayoutNode, targetNode: LayoutNode) {
   const y2 = targetNode.y + targetNode.height / 2;
   const dx = x2 - x1;
   const curve = Math.max(40, dx * 0.4);
-
   return `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`;
 }
 
 function getNumericEdgeId(link: SankeyLink): number | null {
   const raw = (link as { edgeId?: number }).edgeId;
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return raw;
-  }
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   return null;
 }
 
 export default function MultiRunSankey({
   data,
   selectedEdgeId = null,
+  activeRunId = null,
   onSelectEdge,
-  onSelectCluster,
 }: Props) {
-  const {
-    columns,
-    layoutNodes,
-    layoutLinks,
-    maxStrokeValue,
-    minRunId,
-    maxRunId,
-  } = useMemo(() => {
+  const { columns, layoutNodes, layoutLinks, maxStrokeValue, minRunId, maxRunId } = useMemo(() => {
     const nodes = data.nodes ?? [];
     const links = data.links ?? [];
 
@@ -125,7 +113,6 @@ export default function MultiRunSankey({
     }
 
     const sortedDepths = [...grouped.keys()].sort((a, b) => a - b);
-
     const runIds = [...new Set(nodes.map((node) => node.runId))].sort((a, b) => a - b);
     const minRunId = runIds[0] ?? null;
     const maxRunId = runIds[runIds.length - 1] ?? null;
@@ -140,6 +127,7 @@ export default function MultiRunSankey({
 
     const visibleNodeIdMap = new Map<number, Set<string>>();
     const hiddenNodeIdMap = new Map<number, Set<string>>();
+
     const preparedColumns: Array<{
       depth: number;
       columnIndex: number;
@@ -149,19 +137,12 @@ export default function MultiRunSankey({
 
     for (const [columnIndex, depth] of sortedDepths.entries()) {
       const sourceNodes = grouped.get(depth) ?? [];
-
       const prepared: PreparedNode[] = sourceNodes
         .map((node) => {
           const inbound = inboundMap.get(node.id) ?? 0;
           const outbound = outboundMap.get(node.id) ?? 0;
           const totalFlow = Math.max(inbound, outbound, node.size ?? 0);
-
-          return {
-            ...node,
-            inbound,
-            outbound,
-            totalFlow,
-          };
+          return { ...node, inbound, outbound, totalFlow };
         })
         .sort((a, b) => {
           if (b.totalFlow !== a.totalFlow) return b.totalFlow - a.totalFlow;
@@ -174,7 +155,6 @@ export default function MultiRunSankey({
 
       const visibleIds = new Set(visible.map((node) => node.id));
       const hiddenIds = new Set(hidden.map((node) => node.id));
-
       visibleNodeIdMap.set(depth, visibleIds);
       hiddenNodeIdMap.set(depth, hiddenIds);
 
@@ -185,20 +165,22 @@ export default function MultiRunSankey({
         const otherFlow = hidden.reduce((sum, node) => sum + node.totalFlow, 0);
 
         const otherNode: PreparedNode = {
-          id: `other:${depth}`,
+          id: `other-${depth}`,
           label: "Other",
           runId: hidden[0].runId,
           clusterId: -1,
           clusterLabel: -1,
           size: otherSize,
           depth,
-          meta: {
-            nameShort: `Other (${hidden.length})`,
-          } as SankeyNode["meta"],
+          meta: { nameShort: `Other (${hidden.length})` } as SankeyNode["meta"],
           inbound: otherInbound,
           outbound: otherOutbound,
           totalFlow: otherFlow,
           isOther: true,
+          group: hidden[0].group,
+          type: hidden[0].type,
+          positionHint: hidden[0].positionHint,
+          styleHints: hidden[0].styleHints,
         };
 
         visible.push(otherNode);
@@ -221,39 +203,30 @@ export default function MultiRunSankey({
       const visibleIds = visibleNodeIdMap.get(depth) ?? new Set<string>();
       const hiddenIds = hiddenNodeIdMap.get(depth) ?? new Set<string>();
 
-      if (visibleIds.has(originalNodeId)) {
-        return originalNodeId;
-      }
-
-      if (hiddenIds.has(originalNodeId)) {
-        return `other:${depth}`;
-      }
-
+      if (visibleIds.has(originalNodeId)) return originalNodeId;
+      if (hiddenIds.has(originalNodeId)) return `other-${depth}`;
       return originalNodeId;
     }
 
     for (const link of links) {
       const sourceNode = nodes.find((node) => node.id === link.source);
       const targetNode = nodes.find((node) => node.id === link.target);
-
       if (!sourceNode || !targetNode) continue;
 
       const mappedSource = mapNodeId(link.source, sourceNode.depth);
       const mappedTarget = mapNodeId(link.target, targetNode.depth);
-      const aggregateKey = `${mappedSource}->${mappedTarget}`;
-      const existing = remappedLinksMap.get(aggregateKey);
+      const aggregateKey = `${mappedSource}-${mappedTarget}`;
 
+      const existing = remappedLinksMap.get(aggregateKey);
       if (existing) {
         existing.value += link.value;
         existing.score = Math.max(existing.score, link.score);
         existing.similarity = Math.max(existing.similarity, link.similarity);
-        if (existing.edgeId === null) {
-          existing.edgeId = getNumericEdgeId(link);
-        }
+        if (existing.edgeId == null) existing.edgeId = getNumericEdgeId(link);
         existing.isSynthetic =
-          existing.isSynthetic ||
-          mappedSource.startsWith("other:") ||
-          mappedTarget.startsWith("other:");
+          Boolean(existing.isSynthetic) ||
+          mappedSource.startsWith("other-") ||
+          mappedTarget.startsWith("other-");
       } else {
         remappedLinksMap.set(aggregateKey, {
           id: aggregateKey,
@@ -263,25 +236,19 @@ export default function MultiRunSankey({
           score: link.score,
           similarity: link.similarity,
           edgeId: getNumericEdgeId(link),
-          isSynthetic:
-            mappedSource.startsWith("other:") || mappedTarget.startsWith("other:"),
+          isSynthetic: mappedSource.startsWith("other-") || mappedTarget.startsWith("other-"),
         });
       }
     }
 
     const allPreparedNodes = preparedColumns.flatMap((column) => column.nodes);
     const maxNodeFlow = Math.max(...allPreparedNodes.map((node) => node.totalFlow), 1);
-    const layoutNodes: LayoutNode[] = [];
 
+    const layoutNodes: LayoutNode[] = [];
     for (const column of preparedColumns) {
       const x = getColumnX(column.columnIndex);
-
       const heights = column.nodes.map((node) =>
-        clamp(
-          (node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT,
-          MIN_NODE_HEIGHT,
-          MAX_NODE_HEIGHT,
-        ),
+        clamp((node.totalFlow / maxNodeFlow) * MAX_NODE_HEIGHT, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT),
       );
 
       const totalHeight =
@@ -294,7 +261,6 @@ export default function MultiRunSankey({
       for (let i = 0; i < column.nodes.length; i += 1) {
         const node = column.nodes[i];
         const height = heights[i];
-
         layoutNodes.push({
           ...node,
           x,
@@ -303,19 +269,16 @@ export default function MultiRunSankey({
           height,
           columnIndex: column.columnIndex,
         });
-
         currentY += height + NODE_GAP;
       }
     }
 
     const layoutNodeMap = new Map<string, LayoutNode>();
-    for (const node of layoutNodes) {
-      layoutNodeMap.set(node.id, node);
-    }
+    for (const node of layoutNodes) layoutNodeMap.set(node.id, node);
 
-    const remappedLinks = [...remappedLinksMap.values()].filter((link) => {
-      return layoutNodeMap.has(link.source) && layoutNodeMap.has(link.target);
-    });
+    const remappedLinks = [...remappedLinksMap.values()].filter(
+      (link) => layoutNodeMap.has(link.source) && layoutNodeMap.has(link.target),
+    );
 
     const maxStrokeValue = Math.max(...remappedLinks.map((link) => link.value), 1);
 
@@ -327,23 +290,12 @@ export default function MultiRunSankey({
         ...link,
         sourceNode,
         targetNode,
-        strokeWidth: clamp(
-          (link.value / maxStrokeValue) * MAX_STROKE,
-          MIN_STROKE,
-          MAX_STROKE,
-        ),
+        strokeWidth: clamp((link.value / maxStrokeValue) * MAX_STROKE, MIN_STROKE, MAX_STROKE),
         path: buildLinkPath(sourceNode, targetNode),
       };
     });
 
-    return {
-      columns: preparedColumns,
-      layoutNodes,
-      layoutLinks,
-      maxStrokeValue,
-      minRunId,
-      maxRunId,
-    };
+    return { columns: preparedColumns, layoutNodes, layoutLinks, maxStrokeValue, minRunId, maxRunId };
   }, [data]);
 
   if (!data.nodes.length) {
@@ -362,23 +314,27 @@ export default function MultiRunSankey({
 
   return (
     <section>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium sm:text-base">Multi-run lineage</h3>
+          <h3 className="text-base font-medium">Multi-run lineage</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Runs {minRunId ?? "—"} → {maxRunId ?? "—"}. Showing top {MAX_NODES_PER_COLUMN} nodes per run plus aggregated remainder.
+            Runs {minRunId ?? "—"} → {maxRunId ?? "—"}. Showing top {MAX_NODES_PER_COLUMN} nodes per
+            run plus aggregated remainder.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+        <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
           <div className="rounded-md border bg-background px-3 py-2">
-            Nodes: <span className="font-medium text-foreground">{layoutNodes.length}</span>
+            Nodes <span className="font-medium text-foreground">{layoutNodes.length}</span>
           </div>
           <div className="rounded-md border bg-background px-3 py-2">
-            Links: <span className="font-medium text-foreground">{layoutLinks.length}</span>
+            Links <span className="font-medium text-foreground">{layoutLinks.length}</span>
           </div>
           <div className="rounded-md border bg-background px-3 py-2">
-            Runs: <span className="font-medium text-foreground">{data.stats.runCount}</span>
+            Runs <span className="font-medium text-foreground">{data.stats.runCount}</span>
+          </div>
+          <div className="rounded-md border bg-background px-3 py-2">
+            Active run <span className="font-medium text-foreground">{activeRunId ?? "—"}</span>
           </div>
         </div>
       </div>
@@ -386,14 +342,26 @@ export default function MultiRunSankey({
       <div className="overflow-x-auto rounded-xl border bg-background">
         <svg
           viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
-          className="h-[520px] sm:h-[620px] lg:h-[760px]"
+          className="h-[760px]"
           style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
         >
           <defs>
-            <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0.55" />
-              <stop offset="50%" stopColor="#94a3b8" stopOpacity="0.36" />
-              <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.55" />
+            <linearGradient id="sankey-band-gradient-muted" x1="0" x2="100%" y1="0" y2="0">
+              <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0.5" />
+              <stop offset="50%" stopColor="#cbd5e1" stopOpacity="0.26" />
+              <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.5" />
+            </linearGradient>
+
+            <linearGradient id="sankey-band-gradient-active" x1="0" x2="100%" y1="0" y2="0">
+              <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#0f766e" stopOpacity="0.78" />
+              <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
+            </linearGradient>
+
+            <linearGradient id="sankey-band-gradient-selected" x1="0" x2="100%" y1="0" y2="0">
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.98" />
+              <stop offset="50%" stopColor="#1d4ed8" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#2563eb" stopOpacity="0.98" />
             </linearGradient>
           </defs>
 
@@ -403,8 +371,8 @@ export default function MultiRunSankey({
                 x={getColumnX(column.columnIndex) + COLUMN_NODE_WIDTH / 2}
                 y={42}
                 textAnchor="middle"
-                fontSize="14"
-                fontWeight="600"
+                fontSize={14}
+                fontWeight={600}
                 fill="#52525b"
               >
                 Run {column.runId ?? "—"}
@@ -414,33 +382,45 @@ export default function MultiRunSankey({
 
           {layoutLinks.map((link) => {
             const isSelected =
-              selectedEdgeId !== null &&
-              link.edgeId !== null &&
-              selectedEdgeId === link.edgeId;
+              selectedEdgeId != null && link.edgeId != null && selectedEdgeId === link.edgeId;
+
+            const isClickableForRun =
+              activeRunId != null &&
+              link.edgeId != null &&
+              !link.isSynthetic &&
+              link.sourceNode.runId === activeRunId;
+
+            const stroke = isSelected
+              ? "url(#sankey-band-gradient-selected)"
+              : isClickableForRun
+                ? "url(#sankey-band-gradient-active)"
+                : "url(#sankey-band-gradient-muted)";
+
+            const strokeOpacity = isSelected ? 1 : isClickableForRun ? 0.95 : 0.22;
 
             return (
               <path
                 key={link.id}
                 d={link.path}
                 fill="none"
-                stroke="url(#sankey-band-gradient)"
-                strokeWidth={link.strokeWidth}
-                strokeOpacity={isSelected ? 0.95 : 0.5}
+                stroke={stroke}
+                strokeWidth={isSelected ? link.strokeWidth + 1.5 : link.strokeWidth}
+                strokeOpacity={strokeOpacity}
                 strokeLinecap="round"
-                className={link.edgeId !== null ? "cursor-pointer" : undefined}
+                className={isClickableForRun ? "cursor-pointer transition-all" : "transition-all"}
                 onClick={() => {
-                  if (link.edgeId !== null) {
+                  if (isClickableForRun && link.edgeId != null) {
                     onSelectEdge?.(link.edgeId);
                   }
                 }}
               >
                 <title>
-                  {`${link.sourceNode.label} → ${link.targetNode.label}
-Overlap: ${link.value}
-Score: ${formatNumber(link.score, 3)}
-Similarity: ${formatNumber(link.similarity, 3)}${
-                    link.isSynthetic ? "\nAggregated link" : ""
-                  }`}
+                  {`${link.sourceNode.label ?? link.sourceNode.id} → ${
+                    link.targetNode.label ?? link.targetNode.id
+                  }
+Score ${formatNumber(link.score, 3)}
+Similarity ${formatNumber(link.similarity, 3)}
+Clickable: ${isClickableForRun ? "yes" : "no"}`}
                 </title>
               </path>
             );
@@ -451,25 +431,25 @@ Similarity: ${formatNumber(link.similarity, 3)}${
             const shortLabel = ellipsize(label, node.isOther ? 18 : 20);
 
             const hasSelectedConnection =
-              selectedEdgeId !== null &&
+              selectedEdgeId != null &&
               layoutLinks.some(
                 (link) =>
                   link.edgeId === selectedEdgeId &&
                   (link.sourceNode.id === node.id || link.targetNode.id === node.id),
               );
 
-            const isClusterSelectable =
-              !node.isOther && typeof node.clusterId === "number" && node.clusterId > 0;
+            const hasClickableConnection =
+              activeRunId != null &&
+              layoutLinks.some(
+                (link) =>
+                  link.edgeId != null &&
+                  !link.isSynthetic &&
+                  link.sourceNode.runId === activeRunId &&
+                  (link.sourceNode.id === node.id || link.targetNode.id === node.id),
+              );
 
             return (
-              <g
-                key={node.id}
-                className={isClusterSelectable ? "cursor-pointer" : undefined}
-                onClick={() => {
-                  if (!isClusterSelectable) return;
-                  onSelectCluster?.(node.runId, node.clusterId, label);
-                }}
-              >
+              <g key={node.id}>
                 <rect
                   x={node.x}
                   y={node.y}
@@ -480,70 +460,54 @@ Similarity: ${formatNumber(link.similarity, 3)}${
                     node.isOther
                       ? "#eef2f7"
                       : hasSelectedConnection
-                        ? "#e2e8f0"
-                        : "#f3f4f6"
+                        ? "#dbeafe"
+                        : hasClickableConnection
+                          ? "#ecfeff"
+                          : "#f3f4f6"
                   }
                   stroke={
                     node.isOther
                       ? "#cbd5e1"
                       : hasSelectedConnection
-                        ? "#94a3b8"
-                        : "#d1d5db"
+                        ? "#60a5fa"
+                        : hasClickableConnection
+                          ? "#14b8a6"
+                          : "#d1d5db"
                   }
                 />
-
-                <text
-                  x={node.x + 10}
-                  y={node.y + 20}
-                  fontSize="12"
-                  fontWeight={node.isOther ? "500" : "600"}
-                  fill="#111827"
-                >
+                <text x={node.x + 10} y={node.y + 20} fontSize={12} fontWeight={node.isOther ? 500 : 600} fill="#111827">
                   {shortLabel}
                 </text>
-
-                {node.height >= 42 && (
-                  <text
-                    x={node.x + 10}
-                    y={node.y + 37}
-                    fontSize="10.5"
-                    fill="#64748b"
-                  >
-                    {node.isOther
-                      ? `size ${node.size}`
-                      : `C${node.clusterId} · size ${node.size}`}
+                {node.height > 42 && (
+                  <text x={node.x + 10} y={node.y + 37} fontSize={10.5} fill="#64748b">
+                    {node.isOther ? `size ${node.size}` : `C${node.clusterId} · size ${node.size}`}
                   </text>
                 )}
-
                 <title>
                   {`${label}
 Run ${node.runId}
 Size ${node.size}
-Flow ${formatNumber(node.totalFlow, 0)}${
-                    node.isOther ? "\nAggregated remainder" : ""
-                  }`}
+Flow ${formatNumber(node.totalFlow, 0)}${node.isOther ? " (remainder)" : ""}`}
                 </title>
               </g>
             );
           })}
 
-          <text
-            x={PADDING_LEFT}
-            y={SVG_HEIGHT - 18}
-            fontSize="12"
-            fill="#6b7280"
-          >
-            Top nodes per run are shown directly; lower-volume nodes are grouped into “Other”.
+          <text x={PADDING_LEFT} y={SVG_HEIGHT - 18} fontSize={12} fill="#6b7280">
+            Colored links are clickable for the active run; muted links are inactive in the current focus.
           </text>
         </svg>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
         <div className="rounded-md border bg-background px-3 py-2">
-          Thickest band: <span className="font-medium text-foreground">{formatNumber(maxStrokeValue, 0)}</span>
+          Thickest band <span className="font-medium text-foreground">{formatNumber(maxStrokeValue, 0)}</span>
         </div>
         <div className="rounded-md border bg-background px-3 py-2">
-          Selected edge: <span className="font-medium text-foreground">{selectedEdgeId ?? "—"}</span>
+          Selected edge <span className="font-medium text-foreground">{selectedEdgeId ?? "—"}</span>
+        </div>
+        <div className="rounded-md border bg-background px-3 py-2">
+          Clickable run <span className="font-medium text-foreground">{activeRunId ?? "—"}</span>
         </div>
       </div>
     </section>
