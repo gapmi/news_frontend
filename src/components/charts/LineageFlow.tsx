@@ -147,82 +147,86 @@ function GraphCanvas({
       };
     });
 
-    const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
-      const sourceNode = nodeMap.get(edge.source);
-      const targetNode = nodeMap.get(edge.target);
+const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
+  const sourceNode = nodeMap.get(edge.source);
+  const targetNode = nodeMap.get(edge.target);
 
-      const sourceRunId = sourceNode?.runId ?? null;
-      const targetRunId = targetNode?.runId ?? null;
+  const sourceRunId = sourceNode?.runId ?? null;
+  const targetRunId = targetNode?.runId ?? null;
 
-      const isSelected = selectedEdgeId === edge.edgeId;
+  const isSelected = selectedEdgeId === edge.edgeId;
+  const hasEulerDetail = typeof edge.edgeId === "number" && Number.isFinite(edge.edgeId);
 
-      const touchesSelectedRun =
-        selectedRunId !== null &&
-        (sourceRunId === selectedRunId || targetRunId === selectedRunId);
+  const touchesSelectedRun =
+    selectedRunId !== null &&
+    (sourceRunId === selectedRunId || targetRunId === selectedRunId);
 
-      const sourceColor =
-        sourceRunId !== null ? getRunColor(sourceRunId, runOrder) : "#94a3b8";
-      const targetColor =
-        targetRunId !== null ? getRunColor(targetRunId, runOrder) : "#94a3b8";
+  const isEulerClickable = touchesSelectedRun && hasEulerDetail;
+  const isRunRelatedOnly = touchesSelectedRun && !hasEulerDetail;
 
-      let stroke = "#94a3b8";
-      let opacity = 0.55;
-      let markerColor = "#94a3b8";
+  const baseRunColor =
+    selectedRunId !== null
+      ? getRunColor(selectedRunId, runOrder)
+      : sourceRunId !== null
+        ? getRunColor(sourceRunId, runOrder)
+        : "#94a3b8";
 
-      if (selectedRunId === null) {
-        stroke = sourceColor;
-        markerColor = sourceColor;
-        opacity = 0.55;
-      } else if (touchesSelectedRun) {
-        if (sourceRunId === selectedRunId && targetRunId !== selectedRunId) {
-          stroke = sourceColor;
-          markerColor = sourceColor;
-        } else if (targetRunId === selectedRunId && sourceRunId !== selectedRunId) {
-          stroke = targetColor;
-          markerColor = targetColor;
-        } else {
-          stroke = getRunColor(selectedRunId, runOrder);
-          markerColor = stroke;
-        }
-        opacity = 0.92;
-      } else {
-        stroke = "#cbd5e1";
-        markerColor = "#cbd5e1";
-        opacity = 0.22;
-      }
+  let stroke = "#cbd5e1";
+  let opacity = 0.22;
+  let markerColor = "#cbd5e1";
+  let strokeWidth = Math.max(1.5, Math.min(6, edge.overlapCount / 4));
 
-      if (isSelected) {
-        stroke = "#0f172a";
-        markerColor = "#0f172a";
-        opacity = 1;
-      }
+  if (selectedRunId === null) {
+    stroke = hasEulerDetail ? baseRunColor : "#7e6a91";
+    markerColor = stroke;
+    opacity = hasEulerDetail ? 0.58 : 0.42;
+  } else if (isEulerClickable) {
+    stroke = baseRunColor;
+    markerColor = baseRunColor;
+    opacity = 0.95;
+    strokeWidth = Math.max(2.2, strokeWidth);
+  } else if (isRunRelatedOnly) {
+    stroke = "#7c6792";
+    markerColor = "#7c6792";
+    opacity = 0.72;
+  } else {
+    stroke = "#d4d4d8";
+    markerColor = "#d4d4d8";
+    opacity = 0.18;
+  }
 
-      return {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
-        animated: isSelected,
-        style: {
-          stroke,
-          strokeOpacity: opacity,
-          strokeWidth: isSelected
-            ? 3.5
-            : Math.max(1.5, Math.min(6, edge.overlapCount / 4)),
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: markerColor,
-        },
-        labelStyle: {
-          fontSize: 11,
-          fill: "#475569",
-        },
-        data: {
-          edgeId: edge.edgeId,
-        },
-      };
-    });
+  if (isSelected) {
+    stroke = "#0f172a";
+    markerColor = "#0f172a";
+    opacity = 1;
+    strokeWidth = Math.max(3.5, strokeWidth);
+  }
+
+  return {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
+    animated: isSelected,
+    style: {
+      stroke,
+      strokeOpacity: opacity,
+      strokeWidth,
+    },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: markerColor,
+    },
+    labelStyle: {
+      fontSize: 11,
+      fill: "#475569",
+    },
+    data: {
+      edgeId: edge.edgeId,
+      hasEulerDetail,
+    },
+  };
+});
 
     return { nodes: graphNodes, edges: graphEdges };
   }, [data, selectedEdgeId, selectedRunId]);
