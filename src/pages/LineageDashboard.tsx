@@ -10,7 +10,8 @@ import {
   getSankeyView,
   type LineageEdge,
 } from "@/api/clustering";
-
+import MultiRunSankey from "@/components/charts/MultiRunSankey";
+import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
 import { getLineageWindow } from "@/utils/lineageWindow";
 
 function formatDate(value: string | null) {
@@ -145,9 +146,9 @@ export default function LineageDashboard() {
   const edgeParams =
     parentRunId !== null && childRunId !== null && parentRunId !== childRunId
       ? {
-          parent_run_id: parentRunId,
-          child_run_id: childRunId,
-          min_score: minScore,
+          parentrunid: parentRunId,
+          childrunid: childRunId,
+          minscore: minScore,
           limit: 20,
         }
       : null;
@@ -246,10 +247,7 @@ export default function LineageDashboard() {
                   </option>
                 ))}
               </select>
-              <span
-                id="child-run-helper"
-                className="text-xs text-muted-foreground"
-              >
+              <span id="child-run-helper" className="text-xs text-muted-foreground">
                 {childRunHelperText}
               </span>
             </label>
@@ -292,15 +290,34 @@ export default function LineageDashboard() {
           </div>
         </section>
 
+        <section className="mb-6">
+          {sankeyQuery.isLoading && (
+            <div className="rounded-lg border bg-card p-4 shadow-sm text-sm">
+              Loading Sankey...
+            </div>
+          )}
+
+          {sankeyQuery.error && (
+            <div className="rounded-lg border bg-card p-4 shadow-sm text-sm text-red-600">
+              {(sankeyQuery.error as Error).message}
+            </div>
+          )}
+
+          {sankeyQuery.data && parentRunId !== null && (
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <MultiRunSankey
+                data={sankeyQuery.data}
+                selectedEdgeId={selectedEdgeId}
+                selectedRunId={parentRunId}
+                onSelectEdge={setSelectedEdgeId}
+              />
+            </div>
+          )}
+        </section>
+
         <section className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-lg font-medium">Sankey</h2>
-            {sankeyQuery.isLoading && <p className="mt-2 text-sm">Loading...</p>}
-            {sankeyQuery.error && (
-              <p className="mt-2 text-sm text-red-600">
-                {(sankeyQuery.error as Error).message}
-              </p>
-            )}
             {sankeyQuery.data && (
               <dl className="mt-3 space-y-1 text-sm">
                 <div>Nodes: {sankeyQuery.data.stats.nodeCount}</div>
@@ -381,7 +398,9 @@ export default function LineageDashboard() {
                 {edges.map((edge: LineageEdge) => (
                   <tr
                     key={edge.edgeId}
-                    className="cursor-pointer border-b hover:bg-muted/50"
+                    className={`cursor-pointer border-b hover:bg-muted/50 ${
+                      selectedEdgeId === edge.edgeId ? "bg-muted/40" : ""
+                    }`}
                     onClick={() => setSelectedEdgeId(edge.edgeId)}
                   >
                     <td className="py-2 pr-4">{edge.edgeId}</td>
@@ -431,36 +450,7 @@ export default function LineageDashboard() {
             </p>
           )}
 
-          {eulerQuery.data && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h3 className="font-medium">{eulerQuery.data.labels.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {eulerQuery.data.labels.subtitle}
-                </p>
-                <p className="mt-3 text-sm">
-                  {eulerQuery.data.labels.explanation}
-                </p>
-              </div>
-
-              <div>
-                <dl className="space-y-1 text-sm">
-                  <div>Parent size: {eulerQuery.data.parent.size}</div>
-                  <div>Child size: {eulerQuery.data.child.size}</div>
-                  <div>Overlap: {eulerQuery.data.overlap.count}</div>
-                  <div>
-                    Parent coverage:{" "}
-                    {formatNumber(eulerQuery.data.overlap.parentCoverage)}
-                  </div>
-                  <div>
-                    Child coverage:{" "}
-                    {formatNumber(eulerQuery.data.overlap.childCoverage)}
-                  </div>
-                  <div>Jaccard: {formatNumber(eulerQuery.data.overlap.jaccard)}</div>
-                </dl>
-              </div>
-            </div>
-          )}
+          {eulerQuery.data && <EulerOverlapDiagram detail={eulerQuery.data} />}
         </section>
       </main>
     </div>
