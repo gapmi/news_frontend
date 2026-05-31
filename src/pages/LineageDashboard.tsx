@@ -252,6 +252,10 @@ export default function LineageDashboard() {
     [edges, selectedEdgeId],
   );
 
+  const activeEdgeIds = useMemo(() => {
+  return new Set(edges.map((edge) => edge.edgeId));
+}, [edges]);
+
   const totalVisibleLineageEdges = useMemo(() => {
     return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
   }, [runs]);
@@ -360,13 +364,12 @@ export default function LineageDashboard() {
                   message={(sankeyQuery.error as Error).message}
                 />
               ) : sankeyQuery.data ? (
-                <MultiRunSankey
-                  data={sankeyQuery.data}
-                  selectedEdgeId={selectedEdgeId}
-                  selectedRunId={parentRunId}
-                  onSelectEdge={setSelectedEdgeId}
-                  onSelectCluster={handleSelectCluster}
-                />
+<MultiRunSankey
+  data={sankeyQuery.data}
+  selectedEdgeId={selectedEdgeId}
+  activeEdgeIds={activeEdgeIds}
+  onSelectEdge={setSelectedEdgeId}
+/>
               ) : (
                 <SectionState kind="empty" title="No Sankey data available" />
               )}
@@ -408,12 +411,13 @@ export default function LineageDashboard() {
                 />
               ) : graphQuery.data ? (
                 <LineageFlow
-                  data={graphQuery.data}
-                  selectedEdgeId={selectedEdgeId}
-                  selectedRunId={parentRunId}
-                  onSelectEdge={setSelectedEdgeId}
-                  onSelectCluster={handleSelectCluster}
-                />
+                    data={graphQuery.data}
+                    selectedEdgeId={selectedEdgeId}
+                    selectedRunId={parentRunId}
+                    activeEdgeIds={activeEdgeIds}
+                    onSelectEdge={setSelectedEdgeId}
+                    onSelectCluster={handleSelectCluster}
+                    />
               ) : (
                 <SectionState kind="empty" title="No graph data available" />
               )}

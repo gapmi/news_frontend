@@ -16,6 +16,7 @@ type Props = {
   data: GraphResponse | null;
   selectedEdgeId?: number | null;
   selectedRunId?: number | null;
+  activeEdgeIds?: Set<number>;
   onSelectEdge?: (edgeId: number) => void;
   onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
 };
@@ -52,8 +53,9 @@ function getRunColor(runId: number, runOrder: number[]) {
 
 function GraphCanvas({
   data,
-  selectedEdgeId,
+  selectedEdgeId = null,
   selectedRunId = null,
+  activeEdgeIds = new Set<number>(),
   onSelectEdge,
   onSelectCluster,
 }: Props) {
@@ -78,17 +80,6 @@ function GraphCanvas({
       bucket.sort((a, b) => a.clusterId - b.clusterId);
     }
 
-    const edgeByNodeId = new Map<string, GraphEdge[]>();
-    for (const edge of sourceEdges) {
-      const sourceBucket = edgeByNodeId.get(edge.source) ?? [];
-      sourceBucket.push(edge);
-      edgeByNodeId.set(edge.source, sourceBucket);
-
-      const targetBucket = edgeByNodeId.get(edge.target) ?? [];
-      targetBucket.push(edge);
-      edgeByNodeId.set(edge.target, targetBucket);
-    }
-
     const nodeMap = new Map(sourceNodes.map((node) => [node.id, node] as const));
 
     const graphNodes: Node[] = sourceNodes.map((node: GraphNode) => {
@@ -106,7 +97,6 @@ function GraphCanvas({
         );
 
       const isInSelectedRun = selectedRunId !== null && node.runId === selectedRunId;
-
       const isAdjacentToSelectedRun =
         selectedRunId !== null && Math.abs(node.runId - selectedRunId) === 1;
 
@@ -147,89 +137,83 @@ function GraphCanvas({
       };
     });
 
-const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
-  const sourceNode = nodeMap.get(edge.source);
-  const targetNode = nodeMap.get(edge.target);
+    const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
+      const sourceNode = nodeMap.get(edge.source);
+      const targetNode = nodeMap.get(edge.target);
 
-  const sourceRunId = sourceNode?.runId ?? null;
-  const targetRunId = targetNode?.runId ?? null;
+      const sourceRunId = sourceNode?.runId ?? null;
+      const targetRunId = targetNode?.runId ?? null;
 
-  const isSelected = selectedEdgeId === edge.edgeId;
-  const hasEulerDetail = typeof edge.edgeId === "number" && Number.isFinite(edge.edgeId);
+      const isSelected = selectedEdgeId === edge.edgeId;
+      const isActivePairEdge = activeEdgeIds.has(edge.edgeId);
 
-  const touchesSelectedRun =
-    selectedRunId !== null &&
-    (sourceRunId === selectedRunId || targetRunId === selectedRunId);
+      const isWindowContextEdge =
+        selectedRunId !== null &&
+        (sourceRunId === selectedRunId || targetRunId === selectedRunId);
 
-  const isEulerClickable = touchesSelectedRun && hasEulerDetail;
-  const isRunRelatedOnly = touchesSelectedRun && !hasEulerDetail;
+      const baseRunColor =
+        selectedRunId !== null
+          ? getRunColor(selectedRunId, runOrder)
+          : sourceRunId !== null
+            ? getRunColor(sourceRunId, runOrder)
+            : "#94a3b8";
 
-  const baseRunColor =
-    selectedRunId !== null
-      ? getRunColor(selectedRunId, runOrder)
-      : sourceRunId !== null
-        ? getRunColor(sourceRunId, runOrder)
-        : "#94a3b8";
+      let stroke = "#d4d4d8";
+      let opacity = 0.14;
+      let markerColor = "#d4d4d8";
+      let strokeWidth = Math.max(1.5, Math.min(6, edge.overlapCount / 4));
 
-  let stroke = "#cbd5e1";
-  let opacity = 0.22;
-  let markerColor = "#cbd5e1";
-  let strokeWidth = Math.max(1.5, Math.min(6, edge.overlapCount / 4));
+      if (isActivePairEdge) {
+        stroke = baseRunColor;
+        markerColor = baseRunColor;
+        opacity = 0.95;
+        strokeWidth = Math.max(2.4, strokeWidth);
+      } else if (isWindowContextEdge) {
+        stroke = "#6b5a7a";
+        markerColor = "#6b5a7a";
+        opacity = 0.62;
+      } else {
+        stroke = "#d4d4d8";
+        markerColor = "#d4d4d8";
+        opacity = 0.14;
+      }
 
-  if (selectedRunId === null) {
-    stroke = hasEulerDetail ? baseRunColor : "#7e6a91";
-    markerColor = stroke;
-    opacity = hasEulerDetail ? 0.58 : 0.42;
-  } else if (isEulerClickable) {
-    stroke = baseRunColor;
-    markerColor = baseRunColor;
-    opacity = 0.95;
-    strokeWidth = Math.max(2.2, strokeWidth);
-  } else if (isRunRelatedOnly) {
-    stroke = "#7c6792";
-    markerColor = "#7c6792";
-    opacity = 0.72;
-  } else {
-    stroke = "#d4d4d8";
-    markerColor = "#d4d4d8";
-    opacity = 0.18;
-  }
+      if (isSelected) {
+        stroke = "#0f172a";
+        markerColor = "#0f172a";
+        opacity = 1;
+        strokeWidth = Math.max(3.5, strokeWidth);
+      }
 
-  if (isSelected) {
-    stroke = "#0f172a";
-    markerColor = "#0f172a";
-    opacity = 1;
-    strokeWidth = Math.max(3.5, strokeWidth);
-  }
-
-  return {
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
-    animated: isSelected,
-    style: {
-      stroke,
-      strokeOpacity: opacity,
-      strokeWidth,
-    },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: markerColor,
-    },
-    labelStyle: {
-      fontSize: 11,
-      fill: "#475569",
-    },
-    data: {
-      edgeId: edge.edgeId,
-      hasEulerDetail,
-    },
-  };
-});
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: `#${edge.edgeId} · ${formatNumber(edge.score, 2)}`,
+        animated: isSelected,
+        style: {
+          stroke,
+          strokeOpacity: opacity,
+          strokeWidth,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: markerColor,
+        },
+        className: isActivePairEdge ? "cursor-pointer" : undefined,
+        data: {
+          edgeId: edge.edgeId,
+          isActivePairEdge,
+        },
+        labelStyle: {
+          fontSize: 11,
+          fill: "#475569",
+        },
+      };
+    });
 
     return { nodes: graphNodes, edges: graphEdges };
-  }, [data, selectedEdgeId, selectedRunId]);
+  }, [data, selectedEdgeId, selectedRunId, activeEdgeIds]);
 
   if (!data || data.nodes.length === 0) {
     return (
@@ -259,7 +243,11 @@ const graphEdges: Edge[] = sourceEdges.map((edge: GraphEdge) => {
         }}
         onEdgeClick={(_, edge) => {
           const edgeId = edge.data?.edgeId;
-          if (typeof edgeId === "number") onSelectEdge?.(edgeId);
+          const isActivePairEdge = edge.data?.isActivePairEdge;
+
+          if (typeof edgeId === "number" && isActivePairEdge) {
+            onSelectEdge?.(edgeId);
+          }
         }}
       >
         <Background gap={24} size={1} />
@@ -276,7 +264,8 @@ export default function LineageFlow(props: Props) {
       <div className="mb-3">
         <h2 className="text-base font-medium sm:text-lg">Cluster graph</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Click a cluster to inspect its articles, or an edge to inspect lineage overlap.
+          Bright lines open Euler detail for the current selected pair. Darker lines are
+          context from the current run window.
         </p>
       </div>
 
