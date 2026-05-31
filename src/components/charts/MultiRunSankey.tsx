@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { SankeyLink, SankeyNode, SankeyResponse } from "@/api/clustering";
 
 type Props = {
@@ -122,6 +122,8 @@ export default function MultiRunSankey({
   onSelectEdge,
   onSelectCluster,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
   const {
     columns,
     columnBands,
@@ -375,6 +377,30 @@ export default function MultiRunSankey({
     };
   }, [data, focusedRunId]);
 
+  useEffect(() => {
+    if (!scrollRef.current || focusedRunId === null || columnBands.length === 0) {
+      return;
+    }
+
+    const targetBand = columnBands.find((band) => band.runId === focusedRunId);
+    if (!targetBand) {
+      return;
+    }
+
+    const container = scrollRef.current;
+    const targetCenter = targetBand.x + targetBand.width / 2;
+    const nextLeft = clamp(
+      targetCenter - container.clientWidth / 2,
+      0,
+      Math.max(0, container.scrollWidth - container.clientWidth),
+    );
+
+    container.scrollTo({
+      left: nextLeft,
+      behavior: "smooth",
+    });
+  }, [focusedRunId, columnBands]);
+
   if (!data || !data.nodes.length) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
@@ -413,7 +439,10 @@ export default function MultiRunSankey({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-background">
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto rounded-xl border bg-background"
+      >
         <svg
           viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
           className="h-[760px]"
