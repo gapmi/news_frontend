@@ -365,12 +365,13 @@ export default function LineageDashboard() {
                 />
               ) : sankeyQuery.data ? (
                     <MultiRunSankey
-                    data={sankeyQuery.data}
-                    selectedEdgeId={selectedEdgeId}
-                    activeEdgeIds={activeEdgeIds}
-                    focusedRunId={parentRunId}
-                    onSelectEdge={setSelectedEdgeId}
-                    />
+                        data={sankeyQuery.data}
+                        selectedEdgeId={selectedEdgeId}
+                        activeEdgeIds={activeEdgeIds}
+                        focusedRunId={parentRunId}
+                        onSelectEdge={setSelectedEdgeId}
+                        onSelectCluster={handleSelectCluster}
+                        />
               ) : (
                 <SectionState kind="empty" title="No Sankey data available" />
               )}

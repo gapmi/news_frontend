@@ -7,6 +7,7 @@ type Props = {
   activeEdgeIds?: Set<number>;
   focusedRunId?: number | null;
   onSelectEdge?: (edgeId: number) => void;
+  onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
 };
 
 type PreparedNode = SankeyNode & {
@@ -119,6 +120,7 @@ export default function MultiRunSankey({
   activeEdgeIds = new Set<number>(),
   focusedRunId = null,
   onSelectEdge,
+  onSelectCluster,
 }: Props) {
   const {
     columns,
@@ -425,7 +427,7 @@ export default function MultiRunSankey({
           </defs>
 
           {columnBands.map((band) => (
-            <g key={band.key}>
+            <g key={band.key} pointerEvents="none">
               <rect
                 x={band.x}
                 y={band.y}
@@ -508,11 +510,19 @@ ${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
                   (link.sourceNode.id === node.id || link.targetNode.id === node.id),
               );
 
-            const isFocusedRun =
-              focusedRunId !== null && node.runId === focusedRunId;
+            const isFocusedRun = focusedRunId !== null && node.runId === focusedRunId;
+            const isSelectableCluster = !node.isOther && node.clusterId >= 0;
 
             return (
-              <g key={node.id}>
+              <g
+                key={node.id}
+                className={isSelectableCluster ? "cursor-pointer" : undefined}
+                onClick={() => {
+                  if (isSelectableCluster) {
+                    onSelectCluster?.(node.runId, node.clusterId, label);
+                  }
+                }}
+              >
                 <rect
                   x={node.x}
                   y={node.y}
@@ -544,11 +554,18 @@ ${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
                   fontSize="12"
                   fontWeight={node.isOther ? 500 : 600}
                   fill="#111827"
+                  pointerEvents="none"
                 >
                   {shortLabel}
                 </text>
                 {node.height > 42 && (
-                  <text x={node.x + 10} y={node.y + 37} fontSize="10.5" fill="#64748b">
+                  <text
+                    x={node.x + 10}
+                    y={node.y + 37}
+                    fontSize="10.5"
+                    fill="#64748b"
+                    pointerEvents="none"
+                  >
                     {node.isOther ? `size ${node.size}` : `C${node.clusterId} · size ${node.size}`}
                   </text>
                 )}
@@ -563,7 +580,7 @@ ${node.isOther ? "Aggregated remainder" : ""}`}
             );
           })}
 
-          <text x={PADDING_LEFT} y={SVG_HEIGHT - 18} fontSize="12" fill="#6b7280">
+          <text x={PADDING_LEFT} y={SVG_HEIGHT - 18} fontSize="12" fill="#6b7280" pointerEvents="none">
             Top nodes per run are shown directly; lower-volume nodes are grouped into “Other”.
           </text>
         </svg>
