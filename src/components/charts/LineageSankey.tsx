@@ -253,13 +253,26 @@ export default function LineageSankey({
               const visibleOpacity = isSelected ? 1 : 0.78;
               const visibleStroke = isSelected ? "#6b5af7" : "url(#sankeyGradient)";
 
+              const verticalDelta = endY - startY;
+              const absDelta = Math.abs(verticalDelta);
+              const minVerticalOffset = 26; // минимальная «дуга»
+              const direction = verticalDelta >= 0 ? 1 : -1;
+              const extraOffset =
+                absDelta < minVerticalOffset
+                  ? direction * (minVerticalOffset - absDelta)
+                  : 0;
+
+              const controlY1 = startY + extraOffset * 0.35;
+              const controlY2 = endY - extraOffset * 0.35;
+
               const d = `M ${startX} ${startY}
-                C ${startX + curve} ${startY},
-                  ${endX - curve} ${endY},
+                C ${startX + curve} ${controlY1},
+                  ${endX - curve} ${controlY2},
                   ${endX} ${endY}`;
 
               return (
                 <g key={edge.edgeId}>
+                  {/* видимая линия */}
                   <path
                     d={d}
                     fill="none"
@@ -269,6 +282,7 @@ export default function LineageSankey({
                     strokeLinecap="round"
                     pointerEvents="none"
                   />
+                  {/* хитбокс поверх */}
                   <path
                     d={d}
                     fill="none"
