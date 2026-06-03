@@ -116,15 +116,11 @@ export default function LineageSankey({
       childAgg.set(link.target, childCurrent);
     }
 
-    const layout = (
-      ids: string[],
-      side: "parent" | "child",
-    ): FlowNode[] => {
+    const layout = (ids: string[], side: "parent" | "child"): FlowNode[] => {
       const items = ids
         .map((id) => {
           const node = nodeById.get(id);
-          const agg =
-            side === "parent" ? parentAgg.get(id) : childAgg.get(id);
+          const agg = side === "parent" ? parentAgg.get(id) : childAgg.get(id);
 
           if (!node || !agg) return null;
 
@@ -147,10 +143,10 @@ export default function LineageSankey({
 
       items.sort((a, b) => b.total - a.total);
 
-      const top = 28;
-      const gap = 14;
-      const minH = 34;
-      const maxH = 76;
+      const top = 20;
+      const gap = 10;
+      const minH = 30;
+      const maxH = 64;
       const maxTotal = Math.max(...items.map((item) => item.total), 1);
 
       let cursorY = top;
@@ -203,15 +199,15 @@ export default function LineageSankey({
 
       <div className="overflow-x-auto">
         <svg
-          viewBox="0 0 1100 560"
-          className="h-[560px] w-full min-w-[900px]"
+          viewBox="0 0 1100 480"
+          className="h-[480px] w-full min-w-[900px]"
           role="img"
           aria-label={`Sankey for run ${parentRunId} to run ${childRunId}`}
         >
           <defs>
             <linearGradient id="sankeyGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.55" />
-              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.55" />
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.8" />
             </linearGradient>
           </defs>
 
@@ -233,8 +229,15 @@ export default function LineageSankey({
             const startY = parentNode.y + parentNode.h / 2;
             const endY = childNode.y + childNode.h / 2;
             const curve = 180;
-            const strokeWidth = clamp((edge.overlapCount / maxOverlap) * 22, 3, 22);
+
+            const baseStrokeWidth = clamp(
+              (edge.overlapCount / maxOverlap) * 22,
+              4,
+              22,
+            );
             const isSelected = selectedEdgeId === edge.edgeId;
+            const visibleOpacity = isSelected ? 0.96 : 0.72;
+            const visibleStroke = isSelected ? "#6b5af7" : "url(#sankeyGradient)";
 
             const d = `M ${startX} ${startY}
               C ${startX + curve} ${startY},
@@ -242,24 +245,36 @@ export default function LineageSankey({
                 ${endX} ${endY}`;
 
             return (
-              <path
+              <g
                 key={edge.edgeId}
-                d={d}
-                fill="none"
-                stroke="url(#sankeyGradient)"
-                strokeWidth={strokeWidth}
-                strokeOpacity={isSelected ? 0.96 : 0.4}
-                strokeLinecap="round"
-                className="cursor-pointer transition-opacity"
+                className="cursor-pointer"
                 onClick={() => onSelectEdge?.(edge.edgeId)}
               >
-                <title>
-                  {`Edge ${edge.edgeId}: C${parentNode.clusterId} → C${childNode.clusterId}
+                {/* невидимый, но широкий hitbox для удобного hover/click */}
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={Math.max(baseStrokeWidth + 10, 14)}
+                  strokeLinecap="round"
+                />
+                <path
+                  d={d}
+                  fill="none"
+                  stroke={visibleStroke}
+                  strokeWidth={baseStrokeWidth}
+                  strokeOpacity={visibleOpacity}
+                  strokeLinecap="round"
+                  className="transition-opacity"
+                >
+                  <title>
+                    {`Edge ${edge.edgeId}: C${parentNode.clusterId} → C${childNode.clusterId}
 overlap ${edge.overlapCount}
 score ${formatNumber(edge.score, 3)}
 similarity ${formatNumber(edge.similarity, 3)}`}
-                </title>
-              </path>
+                  </title>
+                </path>
+              </g>
             );
           })}
 
@@ -324,7 +339,8 @@ similarity ${formatNumber(edge.similarity, 3)}`}
       </div>
 
       <div className="mt-3 text-xs text-muted-foreground">
-        Thicker links mean more overlapping articles. Click a link to sync with Euler detail.
+        Thicker links mean more overlapping articles. Click a link to sync with Euler
+        detail.
       </div>
     </section>
   );
