@@ -98,6 +98,7 @@ export default function LineageSankey({
     maxOverlap,
     parentRunId,
     childRunId,
+    contentBottom,
   } = useMemo(() => {
     const nodeById = new Map(data.nodes.map((node) => [node.id, node] as const));
 
@@ -151,16 +152,18 @@ export default function LineageSankey({
 
       let cursorY = top;
 
-      return items.map((item) => {
+      const positioned = items.map((item) => {
         const h = clamp((item.total / maxTotal) * maxH, minH, maxH);
-        const positioned: FlowNode = {
+        const node: FlowNode = {
           ...item,
           y: cursorY,
           h,
         };
         cursorY += h + gap;
-        return positioned;
+        return node;
       });
+
+      return positioned;
     };
 
     const parentIds = [...parentAgg.keys()];
@@ -168,6 +171,10 @@ export default function LineageSankey({
 
     const parentNodes = layout(parentIds, "parent");
     const childNodes = layout(childIds, "child");
+
+    const bottomParent = Math.max(...parentNodes.map((n) => n.y + n.h), 0);
+    const bottomChild = Math.max(...childNodes.map((n) => n.y + n.h), 0);
+    const contentBottom = Math.max(bottomParent, bottomChild) + 24;
 
     return {
       parentNodes,
@@ -177,6 +184,7 @@ export default function LineageSankey({
       maxOverlap: Math.max(...topLinks.map((edge) => edge.overlapCount), 1),
       parentRunId: parentNodes[0]?.runId ?? null,
       childRunId: childNodes[0]?.runId ?? null,
+      contentBottom,
     };
   }, [data.nodes, topLinks]);
 
@@ -187,6 +195,8 @@ export default function LineageSankey({
       </div>
     );
   }
+
+  const svgHeight = clamp(contentBottom + 16, 260, 520);
 
   return (
     <section className="rounded-lg border bg-card p-4 shadow-sm">
@@ -199,15 +209,17 @@ export default function LineageSankey({
 
       <div className="overflow-x-auto">
         <svg
-          viewBox="0 0 1100 480"
-          className="h-[480px] w-full min-w-[900px]"
+          viewBox={`0 0 1100 ${svgHeight}`}
+          className="w-full min-w-[900px]"
+          style={{ height: `${svgHeight}px`, overflow: "visible" }}
+          overflow="visible"
           role="img"
           aria-label={`Sankey for run ${parentRunId} to run ${childRunId}`}
         >
           <defs>
             <linearGradient id="sankeyGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.8" />
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.85" />
             </linearGradient>
           </defs>
 
@@ -218,129 +230,133 @@ export default function LineageSankey({
             Child run {childRunId ?? "—"}
           </text>
 
-          {topLinks.map((edge) => {
-            const parentNode = parentMap.get(edge.source);
-            const childNode = childMap.get(edge.target);
+          <g aria-label="links-layer">
+            {topLinks.map((edge) => {
+              const parentNode = parentMap.get(edge.source);
+              const childNode = childMap.get(edge.target);
 
-            if (!parentNode || !childNode) return null;
+              if (!parentNode || !childNode) return null;
 
-            const startX = 270;
-            const endX = 830;
-            const startY = parentNode.y + parentNode.h / 2;
-            const endY = childNode.y + childNode.h / 2;
-            const curve = 180;
+              const startX = 270;
+              const endX = 830;
+              const startY = parentNode.y + parentNode.h / 2;
+              const endY = childNode.y + childNode.h / 2;
+              const curve = 180;
 
-            const baseStrokeWidth = clamp(
-              (edge.overlapCount / maxOverlap) * 22,
-              4,
-              22,
-            );
-            const isSelected = selectedEdgeId === edge.edgeId;
-            const visibleOpacity = isSelected ? 0.96 : 0.72;
-            const visibleStroke = isSelected ? "#6b5af7" : "url(#sankeyGradient)";
+              const baseStrokeWidth = clamp(
+                (edge.overlapCount / maxOverlap) * 22,
+                4,
+                22,
+              );
 
-            const d = `M ${startX} ${startY}
-              C ${startX + curve} ${startY},
-                ${endX - curve} ${endY},
-                ${endX} ${endY}`;
+              const isSelected = selectedEdgeId === edge.edgeId;
+              const visibleOpacity = isSelected ? 1 : 0.78;
+              const visibleStroke = isSelected ? "#6b5af7" : "url(#sankeyGradient)";
 
-            return (
-              <g
-                key={edge.edgeId}
-                className="cursor-pointer"
-                onClick={() => onSelectEdge?.(edge.edgeId)}
-              >
-                {/* невидимый, но широкий hitbox для удобного hover/click */}
-                <path
-                  d={d}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={Math.max(baseStrokeWidth + 10, 14)}
-                  strokeLinecap="round"
-                />
-                <path
-                  d={d}
-                  fill="none"
-                  stroke={visibleStroke}
-                  strokeWidth={baseStrokeWidth}
-                  strokeOpacity={visibleOpacity}
-                  strokeLinecap="round"
-                  className="transition-opacity"
-                >
-                  <title>
-                    {`Edge ${edge.edgeId}: C${parentNode.clusterId} → C${childNode.clusterId}
+              const d = `M ${startX} ${startY}
+                C ${startX + curve} ${startY},
+                  ${endX - curve} ${endY},
+                  ${endX} ${endY}`;
+
+              return (
+                <g key={edge.edgeId}>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={visibleStroke}
+                    strokeWidth={baseStrokeWidth}
+                    strokeOpacity={visibleOpacity}
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="rgba(0,0,0,0.001)"
+                    strokeWidth={Math.max(baseStrokeWidth + 14, 18)}
+                    strokeLinecap="round"
+                    pointerEvents="stroke"
+                    className="cursor-pointer"
+                    onClick={() => onSelectEdge?.(edge.edgeId)}
+                  >
+                    <title>
+                      {`Edge ${edge.edgeId}: C${parentNode.clusterId} → C${childNode.clusterId}
 overlap ${edge.overlapCount}
 score ${formatNumber(edge.score, 3)}
 similarity ${formatNumber(edge.similarity, 3)}`}
-                  </title>
-                </path>
+                    </title>
+                  </path>
+                </g>
+              );
+            })}
+          </g>
+
+          <g aria-label="parent-nodes-layer">
+            {parentNodes.map((node) => (
+              <g key={node.id}>
+                <rect
+                  x="70"
+                  y={node.y}
+                  width="200"
+                  height={node.h}
+                  rx="10"
+                  fill="#dbeafe"
+                  stroke="#93c5fd"
+                />
+                <text
+                  x="84"
+                  y={node.y + 18}
+                  fontSize="13"
+                  fontWeight="600"
+                  fill="#1e3a8a"
+                >
+                  {truncate(node.shortLabel, 26)}
+                </text>
+                <text x="84" y={node.y + 36} fontSize="11" fill="#1e40af">
+                  {`C${node.clusterId} · size ${node.size}`}
+                </text>
+                <text x="84" y={node.y + 52} fontSize="11" fill="#1e40af">
+                  {`overlap ${node.total} · edges ${node.count}`}
+                </text>
               </g>
-            );
-          })}
+            ))}
+          </g>
 
-          {parentNodes.map((node) => (
-            <g key={node.id}>
-              <rect
-                x="70"
-                y={node.y}
-                width="200"
-                height={node.h}
-                rx="10"
-                fill="#dbeafe"
-                stroke="#93c5fd"
-              />
-              <text
-                x="84"
-                y={node.y + 18}
-                fontSize="13"
-                fontWeight="600"
-                fill="#1e3a8a"
-              >
-                {truncate(node.shortLabel, 26)}
-              </text>
-              <text x="84" y={node.y + 36} fontSize="11" fill="#1e40af">
-                {`C${node.clusterId} · size ${node.size}`}
-              </text>
-              <text x="84" y={node.y + 52} fontSize="11" fill="#1e40af">
-                {`overlap ${node.total} · edges ${node.count}`}
-              </text>
-            </g>
-          ))}
-
-          {childNodes.map((node) => (
-            <g key={node.id}>
-              <rect
-                x="830"
-                y={node.y}
-                width="200"
-                height={node.h}
-                rx="10"
-                fill="#ede9fe"
-                stroke="#c4b5fd"
-              />
-              <text
-                x="844"
-                y={node.y + 18}
-                fontSize="13"
-                fontWeight="600"
-                fill="#5b21b6"
-              >
-                {truncate(node.shortLabel, 26)}
-              </text>
-              <text x="844" y={node.y + 36} fontSize="11" fill="#6d28d9">
-                {`C${node.clusterId} · size ${node.size}`}
-              </text>
-              <text x="844" y={node.y + 52} fontSize="11" fill="#6d28d9">
-                {`overlap ${node.total} · edges ${node.count}`}
-              </text>
-            </g>
-          ))}
+          <g aria-label="child-nodes-layer">
+            {childNodes.map((node) => (
+              <g key={node.id}>
+                <rect
+                  x="830"
+                  y={node.y}
+                  width="200"
+                  height={node.h}
+                  rx="10"
+                  fill="#ede9fe"
+                  stroke="#c4b5fd"
+                />
+                <text
+                  x="844"
+                  y={node.y + 18}
+                  fontSize="13"
+                  fontWeight="600"
+                  fill="#5b21b6"
+                >
+                  {truncate(node.shortLabel, 26)}
+                </text>
+                <text x="844" y={node.y + 36} fontSize="11" fill="#6d28d9">
+                  {`C${node.clusterId} · size ${node.size}`}
+                </text>
+                <text x="844" y={node.y + 52} fontSize="11" fill="#6d28d9">
+                  {`overlap ${node.total} · edges ${node.count}`}
+                </text>
+              </g>
+            ))}
+          </g>
         </svg>
       </div>
 
       <div className="mt-3 text-xs text-muted-foreground">
-        Thicker links mean more overlapping articles. Click a link to sync with Euler
-        detail.
+        Thicker links mean more overlapping articles. Click a link to sync with Euler detail.
       </div>
     </section>
   );
