@@ -306,27 +306,6 @@ export default function LineageDashboard() {
           pipelineStatus={latestPipelineRun?.status ?? null}
         />
 
-        <LineageControlsSection
-          minScore={minScore}
-          onChangeMinScore={(value) => {
-            setMinScore(value);
-            setSelectedEdgeId(null);
-            setSelectedCluster(null);
-          }}
-          timelineRunIds={timelineRunIds}
-          parentRunId={parentRunId}
-          onSelectRun={(runId) => {
-            const nextChildOptions = availablePairs
-              .filter((pair) => pair.parentRunId === runId)
-              .map((pair) => pair.childRunId);
-
-            setManualParentRunId(runId);
-            setManualChildRunId(nextChildOptions[0] ?? null);
-            setSelectedEdgeId(null);
-            setSelectedCluster(null);
-          }}
-        />
-
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]">
           <div className="space-y-6">
             <AnalyticsSection
@@ -376,6 +355,27 @@ export default function LineageDashboard() {
                 <SectionState kind="empty" title="No Sankey data available" />
               )}
             </AnalyticsSection>
+
+            <LineageControlsSection
+                minScore={minScore}
+                onChangeMinScore={(value) => {
+                    setMinScore(value);
+                    setSelectedEdgeId(null);
+                    setSelectedCluster(null);
+                }}
+                timelineRunIds={timelineRunIds}
+                parentRunId={parentRunId}
+                onSelectRun={(runId) => {
+                    const nextChildOptions = availablePairs
+                    .filter((pair) => pair.parentRunId === runId)
+                    .map((pair) => pair.childRunId);
+
+                    setManualParentRunId(runId);
+                    setManualChildRunId(nextChildOptions[0] ?? null);
+                    setSelectedEdgeId(null);
+                    setSelectedCluster(null);
+                }}
+                />
 
             <AnalyticsSection
               title="Semantic map"
