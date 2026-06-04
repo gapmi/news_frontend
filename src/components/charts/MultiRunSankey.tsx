@@ -52,9 +52,9 @@ type ColumnBand = {
   isFocus: boolean;
 };
 
-const SVG_HEIGHT = 760;
-const PADDING_TOP = 84;
-const PADDING_BOTTOM = 52;
+const SVG_HEIGHT = 620;
+const PADDING_TOP = 36;
+const PADDING_BOTTOM = 24;
 const COLUMN_GAP = 220;
 const PADDING_LEFT = 72;
 const PADDING_RIGHT = 72;
@@ -67,7 +67,7 @@ const MAX_STROKE = 18;
 const MAX_NODES_PER_COLUMN = 8;
 
 const BAND_X_PADDING = 20;
-const BAND_Y_PADDING = 16;
+const BAND_Y_PADDING = 10;
 const BAND_RADIUS = 26;
 
 function clamp(value: number, min: number, max: number) {
@@ -450,7 +450,7 @@ export default function MultiRunSankey({
       >
         <svg
           viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
-          className="h-[760px]"
+          className="h-[620px]"
           style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
         >
           {columnBands.map((band) => (
