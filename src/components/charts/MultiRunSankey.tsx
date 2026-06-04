@@ -101,7 +101,12 @@ function buildLinkPath(sourceNode: LayoutNode, targetNode: LayoutNode) {
   const x1 = sourceNode.x + sourceNode.width;
   const y1 = sourceNode.y + sourceNode.height / 2;
   const x2 = targetNode.x;
-  const y2 = targetNode.y + targetNode.height / 2;
+  let y2 = targetNode.y + targetNode.height / 2;
+
+  if (Math.abs(y2 - y1) < 0.01) {
+    y2 += 0.001;
+  }
+
   const dx = x2 - x1;
   const curve = Math.max(40, dx * 0.4);
 
@@ -448,13 +453,6 @@ export default function MultiRunSankey({
           className="h-[760px]"
           style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
         >
-          <defs>
-            <linearGradient id="sankey-band-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.9" />
-            </linearGradient>
-          </defs>
-
           {columnBands.map((band) => (
             <g key={band.key} pointerEvents="none">
               <rect
@@ -491,24 +489,86 @@ export default function MultiRunSankey({
             const isActivePairEdge =
               link.edgeId !== null && activeEdgeIds.has(link.edgeId);
 
-            const stroke = isSelected
-              ? "#0f172a"
-              : isActivePairEdge
-                ? "url(#sankey-band-gradient)"
-                : "#6b5a7a";
-
-            const strokeOpacity = isSelected ? 1 : isActivePairEdge ? 0.92 : 0.42;
-            const isClickable = link.edgeId !== null && isActivePairEdge;
+            if (isSelected || isActivePairEdge) return null;
 
             return (
               <path
                 key={link.id}
                 d={link.path}
                 fill="none"
+                stroke="#6b5a7a"
+                strokeWidth={link.strokeWidth}
+                strokeOpacity={0.42}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pointerEvents="none"
+              >
+                <title>
+                  {`${link.sourceNode.label} → ${link.targetNode.label}
+                    Overlap ${link.value}
+                    Score ${formatNumber(link.score, 3)}
+                    Similarity ${formatNumber(link.similarity, 3)}
+                    Context only`}
+                </title>
+              </path>
+            );
+          })}
+
+          {layoutLinks.map((link) => {
+            const isSelected =
+              selectedEdgeId !== null &&
+              link.edgeId !== null &&
+              selectedEdgeId === link.edgeId;
+
+            const isActivePairEdge =
+              link.edgeId !== null && activeEdgeIds.has(link.edgeId);
+
+            if (!isSelected && !isActivePairEdge) return null;
+
+            const haloColor = isSelected ? "#f59e0b" : "#a78bfa";
+            const haloOpacity = isSelected ? 0.26 : 0.18;
+            const haloWidth = link.strokeWidth + (isSelected ? 10 : 7);
+
+            return (
+              <path
+                key={`${link.id}-halo`}
+                d={link.path}
+                fill="none"
+                stroke={haloColor}
+                strokeWidth={haloWidth}
+                strokeOpacity={haloOpacity}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pointerEvents="none"
+              />
+            );
+          })}
+
+          {layoutLinks.map((link) => {
+            const isSelected =
+              selectedEdgeId !== null &&
+              link.edgeId !== null &&
+              selectedEdgeId === link.edgeId;
+
+            const isActivePairEdge =
+              link.edgeId !== null && activeEdgeIds.has(link.edgeId);
+
+            if (!isSelected && !isActivePairEdge) return null;
+
+            const isClickable = link.edgeId !== null && isActivePairEdge;
+            const stroke = isSelected ? "#0f172a" : "#7c3aed";
+            const strokeOpacity = isSelected ? 1 : 0.95;
+
+            return (
+              <path
+                key={`${link.id}-main`}
+                d={link.path}
+                fill="none"
                 stroke={stroke}
                 strokeWidth={link.strokeWidth}
                 strokeOpacity={strokeOpacity}
                 strokeLinecap="round"
+                strokeLinejoin="round"
                 className={isClickable ? "cursor-pointer" : undefined}
                 onClick={() => {
                   if (isClickable) {
@@ -518,10 +578,10 @@ export default function MultiRunSankey({
               >
                 <title>
                   {`${link.sourceNode.label} → ${link.targetNode.label}
-Overlap ${link.value}
-Score ${formatNumber(link.score, 3)}
-Similarity ${formatNumber(link.similarity, 3)}
-${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
+                    Overlap ${link.value}
+                    Score ${formatNumber(link.score, 3)}
+                    Similarity ${formatNumber(link.similarity, 3)}
+                    ${isActivePairEdge ? "Available in Euler detail" : "Selected edge"}`}
                 </title>
               </path>
             );
@@ -600,10 +660,10 @@ ${isActivePairEdge ? "Available in Euler detail" : "Context only"}`}
                 )}
                 <title>
                   {`${label}
-Run ${node.runId}
-Size ${node.size}
-Flow ${formatNumber(node.totalFlow, 0)}
-${node.isOther ? "Aggregated remainder" : ""}`}
+                    Run ${node.runId}
+                    Size ${node.size}
+                    Flow ${formatNumber(node.totalFlow, 0)}
+                    ${node.isOther ? "Aggregated remainder" : ""}`}
                 </title>
               </g>
             );
