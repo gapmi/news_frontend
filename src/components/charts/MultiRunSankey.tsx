@@ -52,9 +52,9 @@ type ColumnBand = {
   isFocus: boolean;
 };
 
-const SVG_HEIGHT = 620;
-const PADDING_TOP = 36;
-const PADDING_BOTTOM = 24;
+const SVG_HEIGHT = 520;
+const PADDING_TOP = 12;
+const PADDING_BOTTOM = 12;
 const COLUMN_GAP = 220;
 const PADDING_LEFT = 72;
 const PADDING_RIGHT = 72;
@@ -450,7 +450,7 @@ export default function MultiRunSankey({
       >
         <svg
           viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
-          className="h-[620px]"
+          className="h-[520px]"
           style={{ width: `${svgWidth}px`, minWidth: `${svgWidth}px` }}
         >
           {columnBands.map((band) => (
