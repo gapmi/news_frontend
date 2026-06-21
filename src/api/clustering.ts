@@ -381,14 +381,14 @@ export interface ClustersParams {
 }
 
 export interface LineageEdgesParams {
-  parentrunid?: number;
-  childrunid?: number;
-  parentclusterid?: number;
-  childclusterid?: number;
-  minscore?: number;
-  minsimilarity?: number;
-  minoverlapratio?: number;
-  minoverlapcount?: number;
+  parent_run_id?: number;
+  child_run_id?: number;
+  parent_cluster_id?: number;
+  child_cluster_id?: number;
+  min_score?: number;
+  min_similarity?: number;
+  min_overlap_ratio?: number;
+  min_overlap_count?: number;
   limit?: number;
   offset?: number;
   sort?:
@@ -400,24 +400,24 @@ export interface LineageEdgesParams {
 }
 
 export interface SankeyParams {
-  startrunid: number;
-  endrunid: number;
-  minscore?: number;
-  minsimilarity?: number;
-  minoverlapratio?: number;
-  minoverlapcount?: number;
-  linkvalue?: "overlapcount" | "score" | "childsize" | "parentsize";
+  start_run_id: number;
+  end_run_id: number;
+  min_score?: number;
+  min_similarity?: number;
+  min_overlap_ratio?: number;
+  min_overlap_count?: number;
+  link_value?: "overlap_count" | "score" | "child_size" | "parent_size";
 }
 
 export interface GraphParams {
-  startrunid: number;
-  endrunid: number;
-  minscore?: number;
-  minsimilarity?: number;
-  minoverlapratio?: number;
-  minoverlapcount?: number;
-  maxnodes?: number;
-  maxedges?: number;
+  start_run_id: number;
+  end_run_id: number;
+  min_score?: number;
+  min_similarity?: number;
+  min_overlap_ratio?: number;
+  min_overlap_count?: number;
+  max_nodes?: number;
+  max_edges?: number;
 }
 
 export const clusteringKeys = {

@@ -167,17 +167,17 @@ export default function LineageDashboard() {
 
   const sankeyParams = sankeyWindow
     ? {
-        startrunid: sankeyWindow.startRunId,
-        endrunid: sankeyWindow.endRunId + 1,
-        minscore: minScore,
+        start_run_id: sankeyWindow.startRunId,
+        end_run_id: sankeyWindow.endRunId + 1,
+        min_score: minScore,
       }
     : null;
 
   const graphParams = sankeyWindow
     ? {
-        startrunid: sankeyWindow.startRunId,
-        endrunid: sankeyWindow.endRunId + 1,
-        minscore: minScore,
+        start_run_id: sankeyWindow.startRunId,
+        end_run_id: sankeyWindow.endRunId + 1,
+        min_score: minScore,
       }
     : null;
 
@@ -186,9 +186,9 @@ export default function LineageDashboard() {
     childRunId !== null &&
     parentRunId < childRunId
       ? {
-          parentrunid: parentRunId,
-          childrunid: childRunId,
-          minscore: minScore,
+          parent_run_id: parentRunId,
+          child_run_id: childRunId,
+          min_score: minScore,
           limit: 50,
         }
       : null;
@@ -196,7 +196,7 @@ export default function LineageDashboard() {
   const sankeyQuery = useQuery({
     queryKey: sankeyParams
       ? clusteringKeys.sankey(sankeyParams)
-      : clusteringKeys.sankey({ startrunid: 0, endrunid: 0 }),
+      : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
     queryFn: () => getSankeyView(sankeyParams!),
     enabled: Boolean(sankeyParams),
     placeholderData: keepPreviousData,
@@ -205,7 +205,7 @@ export default function LineageDashboard() {
   const graphQuery = useQuery({
     queryKey: graphParams
       ? clusteringKeys.graph(graphParams)
-      : clusteringKeys.graph({ startrunid: 0, endrunid: 0 }),
+      : clusteringKeys.graph({ start_run_id: 0, end_run_id: 0 }),
     queryFn: () => getGraphView(graphParams!),
     enabled: Boolean(graphParams),
     placeholderData: keepPreviousData,
