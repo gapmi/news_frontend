@@ -81,8 +81,9 @@ export interface PipelineRun {
 export interface PipelineRunsParams {
   limit?: number;
   offset?: number;
-  job_type?: string;
+  jobtype?: string;
   status?: string;
+  relatedrunid?: number;
 }
 
 export interface ArticlePreview {
@@ -91,6 +92,83 @@ export interface ArticlePreview {
   url: string | null;
   published: string | null;
   source: string | null;
+}
+
+export interface RadialStats {
+  articleCount: number;
+  coreCount: number;
+  midCount: number;
+  edgeCount: number;
+  outlierRiskCount: number;
+  questionableCount: number;
+  outlierCount: number;
+  subclusterCount: number;
+  unassignedSubclusterCount: number;
+  distanceMin: number | null;
+  distanceMax: number | null;
+  distanceMean: number | null;
+  distanceMedian: number | null;
+}
+
+export interface RadialRing {
+  index: number;
+  key: string;
+  label: string;
+  quantileStart: number;
+  quantileEnd: number;
+  radiusInner: number;
+  radiusOuter: number;
+  articleCount: number;
+}
+
+export interface RadialSector {
+  index: number;
+  key: string;
+  label: string;
+  subclusterId: number | null;
+  startAngleDeg: number;
+  endAngleDeg: number;
+  articleCount: number;
+  colorKey: string | null;
+}
+
+export interface RadialPoint {
+  articleId: number;
+  articleIndex: number;
+  x: number;
+  y: number;
+  radius: number;
+  angleDeg: number;
+  ringIndex: number;
+  ringKey: string;
+  sectorIndex: number;
+  sectorKey: string;
+  subclusterId: number | null;
+  subclusterLabel: string | null;
+  distanceToCentroid: number | null;
+  distanceQuantile: number | null;
+  membershipConfidence: number | null;
+  outlierScore: number | null;
+  nearestNeighborDistance: number | null;
+  nearestAlternativeClusterId: number | null;
+  nearestAlternativeClusterDistance: number | null;
+  isCore: boolean;
+  isEdge: boolean;
+  isOutlierRisk: boolean;
+  isOutlier: boolean;
+  isQuestionable: boolean;
+}
+
+export interface ClusterRadialMap {
+  version: number;
+  ringMode: string;
+  ringCount: number;
+  sectorMode: string;
+  sectorCount: number;
+  stats: RadialStats;
+  rings: RadialRing[];
+  sectors: RadialSector[];
+  points: RadialPoint[];
 }
 
 export interface ClusterDetail {
@@ -111,6 +189,13 @@ export interface ClusterDetail {
   tags?: string[] | null;
   concepts?: string[] | null;
   articles: ArticlePreview[];
+  radialMap: ClusterRadialMap | null;
+}
+
+export interface ClusterDetailParams {
+  includearticles?: boolean;
+  articleslimit?: number;
+  includeradialmap?: boolean;
 }
 
 export interface LineageEdge {
@@ -289,26 +374,21 @@ export interface RunsParams {
 }
 
 export interface ClustersParams {
-  run_id?: number;
-  min_size?: number;
+  runid?: number;
+  minsize?: number;
   limit?: number;
   offset?: number;
 }
 
-export interface ClusterDetailParams {
-  include_articles?: boolean;
-  articles_limit?: number;
-}
-
 export interface LineageEdgesParams {
-  parent_run_id?: number;
-  child_run_id?: number;
-  parent_cluster_id?: number;
-  child_cluster_id?: number;
-  min_score?: number;
-  min_similarity?: number;
-  min_overlap_ratio?: number;
-  min_overlap_count?: number;
+  parentrunid?: number;
+  childrunid?: number;
+  parentclusterid?: number;
+  childclusterid?: number;
+  minscore?: number;
+  minsimilarity?: number;
+  minoverlapratio?: number;
+  minoverlapcount?: number;
   limit?: number;
   offset?: number;
   sort?:
@@ -320,24 +400,24 @@ export interface LineageEdgesParams {
 }
 
 export interface SankeyParams {
-  start_run_id: number;
-  end_run_id: number;
-  min_score?: number;
-  min_similarity?: number;
-  min_overlap_ratio?: number;
-  min_overlap_count?: number;
-  link_value?: "overlap_count" | "score" | "child_size" | "parent_size";
+  startrunid: number;
+  endrunid: number;
+  minscore?: number;
+  minsimilarity?: number;
+  minoverlapratio?: number;
+  minoverlapcount?: number;
+  linkvalue?: "overlapcount" | "score" | "childsize" | "parentsize";
 }
 
 export interface GraphParams {
-  start_run_id: number;
-  end_run_id: number;
-  min_score?: number;
-  min_similarity?: number;
-  min_overlap_ratio?: number;
-  min_overlap_count?: number;
-  max_nodes?: number;
-  max_edges?: number;
+  startrunid: number;
+  endrunid: number;
+  minscore?: number;
+  minsimilarity?: number;
+  minoverlapratio?: number;
+  minoverlapcount?: number;
+  maxnodes?: number;
+  maxedges?: number;
 }
 
 export const clusteringKeys = {
@@ -371,7 +451,10 @@ export function getClusters(params: ClustersParams = {}) {
   );
 }
 
-export function getClusterDetail(clusterId: number, params: ClusterDetailParams = {}) {
+export function getClusterDetail(
+  clusterId: number,
+  params: ClusterDetailParams = {},
+) {
   return fetchJson<ClusterDetail>(
     `/v1/clustering/clusters/${clusterId}${buildQuery(params)}`,
   );

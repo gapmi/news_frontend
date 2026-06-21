@@ -94,8 +94,8 @@ export default function LineageDashboard() {
   });
 
   const pipelineRunsQuery = useQuery({
-    queryKey: clusteringKeys.pipelineRuns({ job_type: "pipeline", limit: 5 }),
-    queryFn: () => getPipelineRuns({ job_type: "pipeline", limit: 5 }),
+    queryKey: clusteringKeys.pipelineRuns({ jobtype: "pipeline", limit: 5 }),
+    queryFn: () => getPipelineRuns({ jobtype: "pipeline", limit: 5 }),
   });
 
   const runs = runsQuery.data?.items ?? [];
@@ -165,20 +165,20 @@ export default function LineageDashboard() {
 
   const timelineRunIds = sankeyWindow?.runIds ?? [];
 
-    const sankeyParams = sankeyWindow
+  const sankeyParams = sankeyWindow
     ? {
-        start_run_id: sankeyWindow.startRunId,
-        end_run_id: sankeyWindow.endRunId + 1,
-        min_score: minScore,
-        }
+        startrunid: sankeyWindow.startRunId,
+        endrunid: sankeyWindow.endRunId + 1,
+        minscore: minScore,
+      }
     : null;
 
-    const graphParams = sankeyWindow
+  const graphParams = sankeyWindow
     ? {
-        start_run_id: sankeyWindow.startRunId,
-        end_run_id: sankeyWindow.endRunId + 1,
-        min_score: minScore,
-        }
+        startrunid: sankeyWindow.startRunId,
+        endrunid: sankeyWindow.endRunId + 1,
+        minscore: minScore,
+      }
     : null;
 
   const edgeParams =
@@ -186,9 +186,9 @@ export default function LineageDashboard() {
     childRunId !== null &&
     parentRunId < childRunId
       ? {
-          parent_run_id: parentRunId,
-          child_run_id: childRunId,
-          min_score: minScore,
+          parentrunid: parentRunId,
+          childrunid: childRunId,
+          minscore: minScore,
           limit: 50,
         }
       : null;
@@ -196,7 +196,7 @@ export default function LineageDashboard() {
   const sankeyQuery = useQuery({
     queryKey: sankeyParams
       ? clusteringKeys.sankey(sankeyParams)
-      : clusteringKeys.sankey({ start_run_id: 0, end_run_id: 0 }),
+      : clusteringKeys.sankey({ startrunid: 0, endrunid: 0 }),
     queryFn: () => getSankeyView(sankeyParams!),
     enabled: Boolean(sankeyParams),
     placeholderData: keepPreviousData,
@@ -205,7 +205,7 @@ export default function LineageDashboard() {
   const graphQuery = useQuery({
     queryKey: graphParams
       ? clusteringKeys.graph(graphParams)
-      : clusteringKeys.graph({ start_run_id: 0, end_run_id: 0 }),
+      : clusteringKeys.graph({ startrunid: 0, endrunid: 0 }),
     queryFn: () => getGraphView(graphParams!),
     enabled: Boolean(graphParams),
     placeholderData: keepPreviousData,
@@ -231,17 +231,20 @@ export default function LineageDashboard() {
   const clusterDetailQuery = useQuery({
     queryKey: selectedCluster
       ? clusteringKeys.cluster(selectedCluster.clusterId, {
-          include_articles: true,
-          articles_limit: 100,
+          includearticles: true,
+          articleslimit: 100,
+          includeradialmap: true,
         })
       : clusteringKeys.cluster(0, {
-          include_articles: true,
-          articles_limit: 100,
+          includearticles: true,
+          articleslimit: 100,
+          includeradialmap: true,
         }),
     queryFn: () =>
       getClusterDetail(selectedCluster!.clusterId, {
-        include_articles: true,
-        articles_limit: 100,
+        includearticles: true,
+        articleslimit: 100,
+        includeradialmap: true,
       }),
     enabled: selectedCluster !== null,
   });
@@ -253,8 +256,8 @@ export default function LineageDashboard() {
   );
 
   const activeEdgeIds = useMemo(() => {
-  return new Set(edges.map((edge) => edge.edgeId));
-}, [edges]);
+    return new Set(edges.map((edge) => edge.edgeId));
+  }, [edges]);
 
   const totalVisibleLineageEdges = useMemo(() => {
     return runs.reduce((sum, run) => sum + run.parentLineageEdgeCount, 0);
@@ -343,39 +346,39 @@ export default function LineageDashboard() {
                   message={(sankeyQuery.error as Error).message}
                 />
               ) : sankeyQuery.data ? (
-                    <MultiRunSankey
-                        data={sankeyQuery.data}
-                        selectedEdgeId={selectedEdgeId}
-                        activeEdgeIds={activeEdgeIds}
-                        focusedRunId={parentRunId}
-                        onSelectEdge={setSelectedEdgeId}
-                        onSelectCluster={handleSelectCluster}
-                        />
+                <MultiRunSankey
+                  data={sankeyQuery.data}
+                  selectedEdgeId={selectedEdgeId}
+                  activeEdgeIds={activeEdgeIds}
+                  focusedRunId={parentRunId}
+                  onSelectEdge={setSelectedEdgeId}
+                  onSelectCluster={handleSelectCluster}
+                />
               ) : (
                 <SectionState kind="empty" title="No Sankey data available" />
               )}
             </AnalyticsSection>
 
             <LineageControlsSection
-                minScore={minScore}
-                onChangeMinScore={(value) => {
-                    setMinScore(value);
-                    setSelectedEdgeId(null);
-                    setSelectedCluster(null);
-                }}
-                timelineRunIds={timelineRunIds}
-                parentRunId={parentRunId}
-                onSelectRun={(runId) => {
-                    const nextChildOptions = availablePairs
-                    .filter((pair) => pair.parentRunId === runId)
-                    .map((pair) => pair.childRunId);
+              minScore={minScore}
+              onChangeMinScore={(value) => {
+                setMinScore(value);
+                setSelectedEdgeId(null);
+                setSelectedCluster(null);
+              }}
+              timelineRunIds={timelineRunIds}
+              parentRunId={parentRunId}
+              onSelectRun={(runId) => {
+                const nextChildOptions = availablePairs
+                  .filter((pair) => pair.parentRunId === runId)
+                  .map((pair) => pair.childRunId);
 
-                    setManualParentRunId(runId);
-                    setManualChildRunId(nextChildOptions[0] ?? null);
-                    setSelectedEdgeId(null);
-                    setSelectedCluster(null);
-                }}
-                />
+                setManualParentRunId(runId);
+                setManualChildRunId(nextChildOptions[0] ?? null);
+                setSelectedEdgeId(null);
+                setSelectedCluster(null);
+              }}
+            />
 
             <AnalyticsSection
               title="Semantic map"
@@ -413,13 +416,13 @@ export default function LineageDashboard() {
                 />
               ) : graphQuery.data ? (
                 <LineageFlow
-                    data={graphQuery.data}
-                    selectedEdgeId={selectedEdgeId}
-                    selectedRunId={parentRunId}
-                    activeEdgeIds={activeEdgeIds}
-                    onSelectEdge={setSelectedEdgeId}
-                    onSelectCluster={handleSelectCluster}
-                    />
+                  data={graphQuery.data}
+                  selectedEdgeId={selectedEdgeId}
+                  selectedRunId={parentRunId}
+                  activeEdgeIds={activeEdgeIds}
+                  onSelectEdge={setSelectedEdgeId}
+                  onSelectCluster={handleSelectCluster}
+                />
               ) : (
                 <SectionState kind="empty" title="No graph data available" />
               )}
@@ -485,7 +488,9 @@ export default function LineageDashboard() {
         selectedCluster={selectedCluster}
         detail={clusterDetailQuery.data ?? null}
         isLoading={clusterDetailQuery.isLoading}
-        error={clusterDetailQuery.error ? (clusterDetailQuery.error as Error).message : null}
+        error={
+          clusterDetailQuery.error ? (clusterDetailQuery.error as Error).message : null
+        }
         onClose={() => setSelectedCluster(null)}
       />
     </>
