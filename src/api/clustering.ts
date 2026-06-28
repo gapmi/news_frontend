@@ -193,9 +193,9 @@ export interface ClusterDetail {
 }
 
 export interface ClusterDetailParams {
-  includearticles?: boolean;
-  articleslimit?: number;
-  includeradialmap?: boolean;
+  include_articles?: boolean;
+  articles_limit?: number;
+  include_radial_map?: boolean;
 }
 
 export interface LineageEdge {
