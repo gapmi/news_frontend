@@ -231,20 +231,20 @@ export default function LineageDashboard() {
   const clusterDetailQuery = useQuery({
     queryKey: selectedCluster
       ? clusteringKeys.cluster(selectedCluster.clusterId, {
-          include_articles: true,
-          articles_limit: 100,
-          include_radial_map: true,
+          includearticles: true,
+          articleslimit: 100,
+          includeradialmap: true,
         })
       : clusteringKeys.cluster(0, {
-          include_articles: true,
-          articles_limit: 100,
-          include_radial_map: true,
+          includearticles: true,
+          articleslimit: 100,
+          includeradialmap: true,
         }),
     queryFn: () =>
-        getClusterDetail(selectedCluster.clusterId, {
-        include_articles: true,
-        articles_limit: 100,
-        include_radial_map: true,
+      getClusterDetail(selectedCluster!.clusterId, {
+        includearticles: true,
+        articleslimit: 100,
+        includeradialmap: true,
       }),
     enabled: selectedCluster !== null,
   });
