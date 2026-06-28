@@ -1,5 +1,6 @@
 import type { ClusterDetail } from "@/api/clustering";
 import ClusterArticlesList from "@/components/lineage/ClusterArticlesList";
+import ClusterRadialMap from "@/components/clusters/ClusterRadialMap";
 
 interface SelectedClusterState {
   runId: number;
@@ -132,7 +133,14 @@ export default function ClusterArticlesDrawer({
               {error}
             </div>
           ) : detail ? (
-            <ClusterArticlesList articles={detail.articles ?? []} />
+            <div className="space-y-4">
+              <ClusterRadialMap
+                radialMap={detail.radialMap}
+                title="Cluster radial map"
+              />
+
+              <ClusterArticlesList articles={detail.articles ?? []} />
+            </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
               No cluster detail available.
