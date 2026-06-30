@@ -42,6 +42,47 @@ function formatNumber(value: number | null | undefined, digits = 3) {
     : "—";
 }
 
+function formatConceptList(values: string[] | null | undefined) {
+  if (!values || values.length === 0) return [];
+  return values.filter(Boolean).slice(0, 8);
+}
+
+function InspectorTabButton({
+  value,
+  activeValue,
+  onChange,
+  children,
+}: {
+  value: InspectorTab;
+  activeValue: InspectorTab;
+  onChange: (value: InspectorTab) => void;
+  children: React.ReactNode;
+}) {
+  const selected = value === activeValue;
+  const tabId = `lineage-inspector-tab-${value}`;
+  const panelId = `lineage-inspector-panel-${value}`;
+
+  return (
+    <button
+      id={tabId}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      aria-controls={panelId}
+      tabIndex={selected ? 0 : -1}
+      onClick={() => onChange(value)}
+      className={[
+        "min-h-10 rounded-lg border text-sm font-medium transition-colors",
+        selected
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "border-border/70 bg-background text-muted-foreground hover:bg-muted",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function LineageInspectorPane({
   selectedCluster,
   clusterDetail,
@@ -56,6 +97,16 @@ export default function LineageInspectorPane({
   const clusterTitle = useMemo(
     () => getClusterTitle(selectedCluster, clusterDetail),
     [selectedCluster, clusterDetail],
+  );
+
+  const conceptList = useMemo(
+    () => formatConceptList(clusterDetail?.concepts),
+    [clusterDetail?.concepts],
+  );
+
+  const tagList = useMemo(
+    () => (clusterDetail?.tags ?? []).filter(Boolean).slice(0, 10),
+    [clusterDetail?.tags],
   );
 
   return (
@@ -93,7 +144,7 @@ export default function LineageInspectorPane({
             <div className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-muted-foreground">
               Articles{" "}
               <span className="font-medium text-foreground">
-                {clusterDetail?.articles.length ?? "—"}
+                {clusterDetail?.articles.length ?? clusterDetail?.size ?? "—"}
               </span>
             </div>
             <div className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-muted-foreground">
@@ -110,26 +161,32 @@ export default function LineageInspectorPane({
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {(["summary", "structure", "articles"] as InspectorTab[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setTab(item)}
-                className={[
-                  "min-h-10 rounded-lg border text-sm font-medium transition-colors",
-                  tab === item
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-border/70 bg-background text-muted-foreground hover:bg-muted",
-                ].join(" ")}
-              >
-                {item === "summary"
-                  ? "Summary"
-                  : item === "structure"
-                    ? "Structure"
-                    : "Articles"}
-              </button>
-            ))}
+          <div
+            className="mt-4 grid grid-cols-3 gap-2"
+            role="tablist"
+            aria-label="Inspector tabs"
+          >
+            <InspectorTabButton
+              value="summary"
+              activeValue={tab}
+              onChange={setTab}
+            >
+              Summary
+            </InspectorTabButton>
+            <InspectorTabButton
+              value="structure"
+              activeValue={tab}
+              onChange={setTab}
+            >
+              Structure
+            </InspectorTabButton>
+            <InspectorTabButton
+              value="articles"
+              activeValue={tab}
+              onChange={setTab}
+            >
+              Articles
+            </InspectorTabButton>
           </div>
         </div>
 
@@ -149,105 +206,193 @@ export default function LineageInspectorPane({
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
               {clusterError}
             </div>
-          ) : tab === "summary" ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-border/70 bg-background p-4">
-                <div className="text-sm font-medium">Cluster summary</div>
-                <div className="mt-4 space-y-3">
-                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Run
+          ) : (
+            <>
+              <div
+                id="lineage-inspector-panel-summary"
+                role="tabpanel"
+                aria-labelledby="lineage-inspector-tab-summary"
+                hidden={tab !== "summary"}
+              >
+                {tab === "summary" ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-border/70 bg-background p-4">
+                      <div className="text-sm font-medium">Cluster summary</div>
+
+                      <div className="mt-4 space-y-3">
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Run
+                          </div>
+                          <div>{selectedCluster.runId}</div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Cluster
+                          </div>
+                          <div>C{selectedCluster.clusterId}</div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Label
+                          </div>
+                          <div>{clusterTitle}</div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Size
+                          </div>
+                          <div>{clusterDetail?.size ?? "—"}</div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Language
+                          </div>
+                          <div>{clusterDetail?.languageCode ?? "—"}</div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Title
+                          </div>
+                          <div>
+                            {clusterDetail?.representativeTitle ?? "No representative title"}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Tags
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {tagList.length > 0 ? (
+                              tagList.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded-full bg-muted px-2 py-1 text-xs text-foreground"
+                                >
+                                  {tag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Concepts
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {conceptList.length > 0 ? (
+                              conceptList.map((concept) => (
+                                <span
+                                  key={concept}
+                                  className="rounded-full border border-border/70 bg-background px-2 py-1 text-xs text-foreground"
+                                >
+                                  {concept}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div>{selectedCluster.runId}</div>
+
+                    {selectedEdge ? (
+                      <div className="rounded-xl border border-border/70 bg-background p-4">
+                        <div className="text-sm font-medium">Active edge</div>
+
+                        <div className="mt-4 space-y-3">
+                          <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                              Pair
+                            </div>
+                            <div>
+                              {selectedEdge.parentRunId}:{selectedEdge.parentClusterId} →{" "}
+                              {selectedEdge.childRunId}:{selectedEdge.childClusterId}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                              Score
+                            </div>
+                            <div>{formatNumber(selectedEdge.score)}</div>
+                          </div>
+
+                          <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                              Similarity
+                            </div>
+                            <div>{formatNumber(selectedEdge.centroidSimilarity)}</div>
+                          </div>
+
+                          <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                              Overlap
+                            </div>
+                            <div>
+                              {selectedEdge.articleOverlapCount} (
+                              {formatNumber(selectedEdge.articleOverlapRatio)})
+                            </div>
+                          </div>
+
+                          {eulerDetail ? (
+                            <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 text-sm">
+                              <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                Jaccard
+                              </div>
+                              <div>{formatNumber(eulerDetail.overlap.jaccard)}</div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Cluster
-                    </div>
-                    <div>C{selectedCluster.clusterId}</div>
-                  </div>
-                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Label
-                    </div>
-                    <div>{clusterTitle}</div>
-                  </div>
-                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Tags
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(clusterDetail?.tags ?? []).length > 0 ? (
-                        clusterDetail?.tags?.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-muted px-2 py-1 text-xs text-foreground"
-                          >
-                            {tag}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                ) : null}
               </div>
 
-              {selectedEdge ? (
-                <div className="rounded-xl border border-border/70 bg-background p-4">
-                  <div className="text-sm font-medium">Active edge</div>
-                  <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Pair
-                      </div>
-                      <div>
-                        {selectedEdge.parentRunId}:{selectedEdge.parentClusterId} →{" "}
-                        {selectedEdge.childRunId}:{selectedEdge.childClusterId}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Score
-                      </div>
-                      <div>{formatNumber(selectedEdge.score)}</div>
-                    </div>
-                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Similarity
-                      </div>
-                      <div>{formatNumber(selectedEdge.centroidSimilarity)}</div>
-                    </div>
-                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 text-sm">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Overlap
-                      </div>
-                      <div>
-                        {selectedEdge.articleOverlapCount} (
-                        {formatNumber(selectedEdge.articleOverlapRatio)})
-                      </div>
+              <div
+                id="lineage-inspector-panel-structure"
+                role="tabpanel"
+                aria-labelledby="lineage-inspector-tab-structure"
+                hidden={tab !== "structure"}
+              >
+                {tab === "structure" ? (
+                  <div className="space-y-4">
+                    <ClusterRadialMap
+                      radialMap={clusterDetail?.radialMap}
+                      title="Cluster radial map"
+                    />
+
+                    <div className="rounded-xl border border-dashed border-border/70 px-4 py-4 text-sm text-muted-foreground">
+                      Structure is reserved for cluster-internal geometry only.
+                      Pair graph stays on the main canvas, and overlap explanation stays
+                      in the dedicated Overlap detail canvas mode.
                     </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          ) : tab === "structure" ? (
-            <div className="space-y-4">
-              <ClusterRadialMap
-                radialMap={clusterDetail?.radialMap}
-                title="Cluster radial map"
-              />
+                ) : null}
+              </div>
 
-              {eulerDetail ? (
-                <div className="rounded-xl border border-dashed border-border/70 px-4 py-4 text-sm text-muted-foreground">
-                  Euler overlap remains in the main canvas “Overlap detail” mode. The
-                  inspector Structure tab is reserved for cluster-internal structure only.
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <ClusterArticlesList articles={clusterDetail?.articles ?? []} />
+              <div
+                id="lineage-inspector-panel-articles"
+                role="tabpanel"
+                aria-labelledby="lineage-inspector-tab-articles"
+                hidden={tab !== "articles"}
+              >
+                {tab === "articles" ? (
+                  <ClusterArticlesList articles={clusterDetail?.articles ?? []} />
+                ) : null}
+              </div>
+            </>
           )}
         </div>
       </div>
