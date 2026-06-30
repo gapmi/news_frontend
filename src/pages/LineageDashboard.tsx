@@ -26,6 +26,7 @@ interface SelectedClusterState {
 
 function formatRelativePipelineTime(value: string | null | undefined) {
   if (!value) return "No recent pipeline run";
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
 
@@ -52,23 +53,43 @@ export default function LineageDashboard() {
 
   const runsQuery = useQuery({
     queryKey: clusteringKeys.runs({
-      status: "completed",
       limit: 100,
       order: "asc",
     }),
     queryFn: () =>
       getClusteringRuns({
-        status: "completed",
         limit: 100,
         order: "asc",
       }),
     staleTime: 30_000,
   });
 
-  const allRunIds = useMemo(
-    () => (runsQuery.data?.items ?? []).map((run) => run.runId).sort((a, b) => a - b),
-    [runsQuery.data],
-  );
+  const pipelineRunsQuery = useQuery({
+    queryKey: clusteringKeys.pipelineRuns({
+      limit: 20,
+      jobtype: "clustering",
+    }),
+    queryFn: () =>
+      getPipelineRuns({
+        limit: 20,
+        jobtype: "clustering",
+      }),
+    staleTime: 30_000,
+  });
+
+  const allRunIds = useMemo(() => {
+    const clusteringRunIds = (runsQuery.data?.items ?? [])
+      .map((run) => run.runId)
+      .filter((value): value is number => Number.isFinite(value));
+
+    const pipelineRunIds = (pipelineRunsQuery.data?.items ?? [])
+      .map((run) => run.relatedRunId)
+      .filter((value): value is number => Number.isFinite(value));
+
+    return Array.from(new Set([...clusteringRunIds, ...pipelineRunIds])).sort(
+      (a, b) => a - b,
+    );
+  }, [runsQuery.data, pipelineRunsQuery.data]);
 
   useEffect(() => {
     if (anchorRunId !== null) return;
@@ -132,6 +153,7 @@ export default function LineageDashboard() {
       const selectedLink = sankeyQuery.data.links.find(
         (link) => link.edgeId === selectedEdgeId,
       );
+
       if (selectedLink) {
         const sourceNode = sankeyQuery.data.nodes.find(
           (node) => node.id === selectedLink.source,
@@ -151,12 +173,14 @@ export default function LineageDashboard() {
 
     if (anchorRunId !== null) {
       const anchorIndex = allRunIds.indexOf(anchorRunId);
+
       if (anchorIndex > 0) {
         return {
           parentRunId: allRunIds[anchorIndex - 1],
           childRunId: anchorRunId,
         };
       }
+
       if (anchorIndex >= 0 && anchorIndex < allRunIds.length - 1) {
         return {
           parentRunId: anchorRunId,
@@ -196,6 +220,7 @@ export default function LineageDashboard() {
 
   const selectedEdge: LineageEdge | null = useMemo(() => {
     if (!selectedEdgeId) return null;
+
     return (
       lineageEdgesQuery.data?.items.find((edge) => edge.edgeId === selectedEdgeId) ??
       null
@@ -229,21 +254,6 @@ export default function LineageDashboard() {
     staleTime: 30_000,
   });
 
-  const pipelineRunsQuery = useQuery({
-    queryKey: clusteringKeys.pipelineRuns({
-      limit: 1,
-      status: "completed",
-      jobtype: "clustering",
-    }),
-    queryFn: () =>
-      getPipelineRuns({
-        limit: 1,
-        status: "completed",
-        jobtype: "clustering",
-      }),
-    staleTime: 30_000,
-  });
-
   useEffect(() => {
     if (!selectedCluster) return;
     if (!windowRunIds.includes(selectedCluster.runId)) {
@@ -259,18 +269,27 @@ export default function LineageDashboard() {
   }, [selectedEdgeId, selectedEdge]);
 
   const latestPipelineRun = pipelineRunsQuery.data?.items?.[0] ?? null;
+
   const pageError =
     runsQuery.error instanceof Error
       ? runsQuery.error.message
-      : sankeyQuery.error instanceof Error
-        ? sankeyQuery.error.message
-        : graphQuery.error instanceof Error
-          ? graphQuery.error.message
-          : null;
+      : pipelineRunsQuery.error instanceof Error
+        ? pipelineRunsQuery.error.message
+        : sankeyQuery.error instanceof Error
+          ? sankeyQuery.error.message
+          : graphQuery.error instanceof Error
+            ? graphQuery.error.message
+            : null;
 
   const isPageLoading =
     runsQuery.isLoading ||
+    pipelineRunsQuery.isLoading ||
     (anchorRunId !== null && (sankeyQuery.isLoading || graphQuery.isLoading));
+
+  const hasNoRuns =
+    !runsQuery.isLoading &&
+    !pipelineRunsQuery.isLoading &&
+    allRunIds.length === 0;
 
   return (
     <div className="space-y-5">
@@ -307,7 +326,7 @@ export default function LineageDashboard() {
                 Window
               </div>
               <div className="mt-2 text-lg font-semibold">
-                {startRunId} → {endRunId}
+                {startRunId && endRunId ? `${startRunId} → ${endRunId}` : "—"}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 Story window
@@ -364,64 +383,82 @@ export default function LineageDashboard() {
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="space-y-5">
-          <LineageTopToolbar
-            timelineRunIds={windowRunIds}
-            anchorRunId={anchorRunId}
-            minScore={minScore}
-            onSelectRun={(runId) => {
-              setAnchorRunId(runId);
-            }}
-            onChangeMinScore={(value) => {
-              setMinScore(value);
-            }}
-          />
-
-          {isPageLoading ? (
-            <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-              <div className="space-y-4">
-                <div className="h-11 w-[360px] animate-pulse rounded-xl bg-muted/50" />
-                <div className="h-6 w-[280px] animate-pulse rounded-md bg-muted/50" />
-                <div className="h-[640px] animate-pulse rounded-xl border border-border/70 bg-muted/30" />
-              </div>
-            </section>
-          ) : (
-            <LineageWorkspaceTabs
-              mode={canvasMode}
-              onChangeMode={setCanvasMode}
-              sankeyData={sankeyQuery.data ?? null}
-              graphData={graphQuery.data ?? null}
-              eulerDetail={eulerDetailQuery.data ?? null}
-              selectedEdge={selectedEdge}
-              selectedEdgeId={selectedEdgeId}
-              activeEdgeIds={activeEdgeIds}
-              focusedRunId={anchorRunId}
-              onSelectEdge={(edgeId) => {
-                setSelectedEdgeId(edgeId);
-                setCanvasMode("overlap");
+      {hasNoRuns ? (
+        <section className="rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+          <div className="max-w-2xl">
+            <h2 className="text-lg font-semibold tracking-tight">
+              No lineage runs available
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              The page did not receive any clustering runs from the lineage API or
+              related run ids from the pipeline API.
+            </p>
+            <div className="mt-4 rounded-xl border border-dashed border-border/70 px-4 py-4 text-sm text-muted-foreground">
+              Check backend data availability, run filters, and whether pipeline
+              runs contain valid relatedRunId values.
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="space-y-5">
+            <LineageTopToolbar
+              timelineRunIds={windowRunIds}
+              anchorRunId={anchorRunId}
+              minScore={minScore}
+              onSelectRun={(runId) => {
+                setAnchorRunId(runId);
               }}
-              onSelectCluster={(runId, clusterId, label) => {
-                setSelectedCluster({ runId, clusterId, label });
+              onChangeMinScore={(value) => {
+                setMinScore(value);
               }}
             />
-          )}
-        </div>
 
-        <LineageInspectorPane
-          selectedCluster={selectedCluster}
-          clusterDetail={clusterDetailQuery.data ?? null}
-          selectedEdge={selectedEdge}
-          eulerDetail={eulerDetailQuery.data ?? null}
-          isLoadingCluster={clusterDetailQuery.isLoading}
-          clusterError={
-            clusterDetailQuery.error instanceof Error
-              ? clusterDetailQuery.error.message
-              : null
-          }
-          onCloseCluster={() => setSelectedCluster(null)}
-        />
-      </div>
+            {isPageLoading ? (
+              <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+                <div className="space-y-4">
+                  <div className="h-11 w-[360px] animate-pulse rounded-xl bg-muted/50" />
+                  <div className="h-6 w-[280px] animate-pulse rounded-md bg-muted/50" />
+                  <div className="h-[640px] animate-pulse rounded-xl border border-border/70 bg-muted/30" />
+                </div>
+              </section>
+            ) : (
+              <LineageWorkspaceTabs
+                mode={canvasMode}
+                onChangeMode={setCanvasMode}
+                sankeyData={sankeyQuery.data ?? null}
+                graphData={graphQuery.data ?? null}
+                eulerDetail={eulerDetailQuery.data ?? null}
+                selectedEdge={selectedEdge}
+                selectedEdgeId={selectedEdgeId}
+                activeEdgeIds={activeEdgeIds}
+                focusedRunId={anchorRunId}
+                onSelectEdge={(edgeId) => {
+                  setSelectedEdgeId(edgeId);
+                  setCanvasMode("overlap");
+                }}
+                onSelectCluster={(runId, clusterId, label) => {
+                  setSelectedCluster({ runId, clusterId, label });
+                }}
+              />
+            )}
+          </div>
+
+          <LineageInspectorPane
+            selectedCluster={selectedCluster}
+            clusterDetail={clusterDetailQuery.data ?? null}
+            selectedEdge={selectedEdge}
+            eulerDetail={eulerDetailQuery.data ?? null}
+            isLoadingCluster={clusterDetailQuery.isLoading}
+            clusterError={
+              clusterDetailQuery.error instanceof Error
+                ? clusterDetailQuery.error.message
+                : null
+            }
+            onCloseCluster={() => setSelectedCluster(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
