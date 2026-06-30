@@ -400,7 +400,7 @@ export default function LineageDashboard() {
           </div>
         </section>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
           <div className="space-y-5">
             <LineageTopToolbar
               timelineRunIds={windowRunIds}

@@ -152,7 +152,7 @@ function resolvePointPosition(
 
 export default function ClusterRadialMap({
   radialMap,
-  title = "Radial map",
+  title = "Cluster radial map",
 }: Props) {
   const [hoveredPoint, setHoveredPoint] = useState<RadialPoint | null>(null);
 
@@ -246,7 +246,9 @@ export default function ClusterRadialMap({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Articles</div>
-            <div className="text-sm font-medium">{radialMap.stats?.articleCount ?? 0}</div>
+            <div className="text-sm font-medium">
+              {radialMap.stats?.articleCount ?? 0}
+            </div>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Rings</div>
@@ -258,7 +260,9 @@ export default function ClusterRadialMap({
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Subclusters</div>
-            <div className="text-sm font-medium">{radialMap.stats?.subclusterCount ?? 0}</div>
+            <div className="text-sm font-medium">
+              {radialMap.stats?.subclusterCount ?? 0}
+            </div>
           </div>
         </div>
       </div>
@@ -271,8 +275,8 @@ export default function ClusterRadialMap({
         <div>
           <h3 className="text-base font-medium">{title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ring mode {radialMap.ringMode ?? "—"} · sector mode {radialMap.sectorMode ?? "—"} · version{" "}
-            {radialMap.version ?? "—"}
+            Ring mode {radialMap.ringMode ?? "—"} · sector mode{" "}
+            {radialMap.sectorMode ?? "—"} · version {radialMap.version ?? "—"}
           </p>
         </div>
 
@@ -304,16 +308,17 @@ export default function ClusterRadialMap({
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-dashed bg-card/30 px-3 py-2 text-xs text-muted-foreground">
+      <div className="mb-3 rounded-lg border border-dashed bg-card/40 px-3 py-2 text-xs text-muted-foreground">
         Rendered: {prepared.rings.length} rings · {prepared.sectors.length} sectors ·{" "}
         {prepared.points.length} visible points
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="overflow-x-auto rounded-xl border bg-card/40 p-3">
+      {/* Главное: карта во всю ширину инспектора, без второго столбца */}
+      <div className="space-y-4">
+        <div className="rounded-xl border bg-card/40 p-3">
           <svg
             viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
-            className="mx-auto h-auto w-full min-w-[360px] max-w-[520px]"
+            className="mx-auto h-auto w-full max-w-[520px]"
             role="img"
             aria-label="Cluster radial map"
           >
@@ -389,7 +394,10 @@ export default function ClusterRadialMap({
                   {`Article ${point.articleId}
 Ring ${point.ringIndex}
 Sector ${point.sectorIndex}
-Confidence ${formatNumber(point.membershipConfidence, 3)}
+Confidence ${formatNumber(
+                    point.membershipConfidence,
+                    3,
+                  )}
 Distance ${formatNumber(point.distanceToCentroid, 3)}`}
                 </title>
               </circle>
@@ -397,7 +405,7 @@ Distance ${formatNumber(point.distanceToCentroid, 3)}`}
           </svg>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border bg-card/40 p-3">
             <div className="text-sm font-medium">Legend</div>
             <div className="mt-3 space-y-2 text-sm">
@@ -449,38 +457,38 @@ Distance ${formatNumber(point.distanceToCentroid, 3)}`}
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="rounded-xl border bg-card/40 p-3">
-            <div className="text-sm font-medium">Hovered point</div>
-            {hoveredPoint ? (
-              <div className="mt-3 grid gap-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Article</span>
-                  <span>{hoveredPoint.articleId}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Subcluster</span>
-                  <span>{hoveredPoint.subclusterLabel ?? "—"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Confidence</span>
-                  <span>{formatNumber(hoveredPoint.membershipConfidence, 3)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Distance</span>
-                  <span>{formatNumber(hoveredPoint.distanceToCentroid, 3)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Outlier score</span>
-                  <span>{formatNumber(hoveredPoint.outlierScore, 3)}</span>
-                </div>
+        <div className="rounded-xl border bg-card/40 p-3">
+          <div className="text-sm font-medium">Hovered point</div>
+          {hoveredPoint ? (
+            <div className="mt-3 grid gap-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Article</span>
+                <span>{hoveredPoint.articleId}</span>
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Hover a point to inspect its membership and distance metrics.
-              </p>
-            )}
-          </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Subcluster</span>
+                <span>{hoveredPoint.subclusterLabel ?? "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Confidence</span>
+                <span>{formatNumber(hoveredPoint.membershipConfidence, 3)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Distance</span>
+                <span>{formatNumber(hoveredPoint.distanceToCentroid, 3)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Outlier score</span>
+                <span>{formatNumber(hoveredPoint.outlierScore, 3)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Hover a point to inspect its membership and distance metrics.
+            </p>
+          )}
         </div>
       </div>
     </section>
