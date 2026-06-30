@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import type {
-  ClusterRadialMap,
+  ClusterRadialMap as ClusterRadialMapData,
   RadialPoint,
   RadialRing,
   RadialSector,
 } from "@/api/clustering";
 
 type Props = {
-  radialMap: ClusterRadialMap | null | undefined;
+  radialMap: ClusterRadialMapData | null | undefined;
   title?: string;
 };
 
@@ -16,7 +16,12 @@ const CENTER = SVG_SIZE / 2;
 const OUTER_RADIUS = 210;
 
 function clamp(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+function safeNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function formatNumber(value: number | null | undefined, digits = 2) {
@@ -26,34 +31,49 @@ function formatNumber(value: number | null | undefined, digits = 2) {
 }
 
 function polarToCartesian(radius: number, angleDeg: number) {
-  const angle = ((angleDeg - 90) * Math.PI) / 180;
+  const safeRadius = safeNumber(radius, 0);
+  const safeAngle = safeNumber(angleDeg, 0);
+  const angle = ((safeAngle - 90) * Math.PI) / 180;
+
   return {
-    x: CENTER + radius * Math.cos(angle),
-    y: CENTER + radius * Math.sin(angle),
+    x: CENTER + safeRadius * Math.cos(angle),
+    y: CENTER + safeRadius * Math.sin(angle),
   };
 }
 
 function describeArc(
-  cx: number,
-  cy: number,
   innerRadius: number,
   outerRadius: number,
   startAngleDeg: number,
   endAngleDeg: number,
 ) {
-  const startOuter = polarToCartesian(outerRadius, endAngleDeg);
-  const endOuter = polarToCartesian(outerRadius, startAngleDeg);
-  const startInner = polarToCartesian(innerRadius, startAngleDeg);
-  const endInner = polarToCartesian(innerRadius, endAngleDeg);
+  const safeInner = Math.max(0, safeNumber(innerRadius, 0));
+  const safeOuter = Math.max(safeInner, safeNumber(outerRadius, 0));
+  const safeStart = safeNumber(startAngleDeg, 0);
+  const safeEnd = safeNumber(endAngleDeg, 0);
 
-  const delta = ((endAngleDeg - startAngleDeg) % 360 + 360) % 360;
+  const startOuter = polarToCartesian(safeOuter, safeEnd);
+  const endOuter = polarToCartesian(safeOuter, safeStart);
+  const startInner = polarToCartesian(safeInner, safeStart);
+  const endInner = polarToCartesian(safeInner, safeEnd);
+
+  const delta = ((safeEnd - safeStart) % 360 + 360) % 360;
   const largeArcFlag = delta > 180 ? 1 : 0;
+
+  if (safeInner <= 0) {
+    return [
+      `M ${CENTER} ${CENTER}`,
+      `L ${startOuter.x} ${startOuter.y}`,
+      `A ${safeOuter} ${safeOuter} 0 ${largeArcFlag} 0 ${endOuter.x} ${endOuter.y}`,
+      "Z",
+    ].join(" ");
+  }
 
   return [
     `M ${startOuter.x} ${startOuter.y}`,
-    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 0 ${endOuter.x} ${endOuter.y}`,
+    `A ${safeOuter} ${safeOuter} 0 ${largeArcFlag} 0 ${endOuter.x} ${endOuter.y}`,
     `L ${startInner.x} ${startInner.y}`,
-    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 1 ${endInner.x} ${endInner.y}`,
+    `A ${safeInner} ${safeInner} 0 ${largeArcFlag} 1 ${endInner.x} ${endInner.y}`,
     "Z",
   ].join(" ");
 }
@@ -89,11 +109,24 @@ function getPointRadius(point: RadialPoint) {
 }
 
 function normalizeRings(rings: RadialRing[]) {
-  const maxOuter = Math.max(...rings.map((ring) => ring.radiusOuter), 1);
-  return rings.map((ring) => ({
+  if (!rings.length) return [];
+
+  const validRings = rings
+    .map((ring) => ({
+      ...ring,
+      radiusInner: safeNumber(ring.radiusInner, 0),
+      radiusOuter: safeNumber(ring.radiusOuter, 0),
+    }))
+    .filter((ring) => ring.radiusOuter >= 0 && ring.radiusOuter >= ring.radiusInner);
+
+  if (!validRings.length) return [];
+
+  const maxOuter = Math.max(1, ...validRings.map((ring) => ring.radiusOuter));
+
+  return validRings.map((ring) => ({
     ...ring,
-    inner: (ring.radiusInner / maxOuter) * OUTER_RADIUS,
-    outer: (ring.radiusOuter / maxOuter) * OUTER_RADIUS,
+    inner: clamp((ring.radiusInner / maxOuter) * OUTER_RADIUS, 0, OUTER_RADIUS),
+    outer: clamp((ring.radiusOuter / maxOuter) * OUTER_RADIUS, 0, OUTER_RADIUS),
   }));
 }
 
@@ -104,15 +137,17 @@ function resolvePointPosition(
 ) {
   if (useCartesian) {
     return {
-      x: CENTER + point.x * OUTER_RADIUS,
-      y: CENTER + point.y * OUTER_RADIUS,
+      x: CENTER + safeNumber(point.x, 0) * OUTER_RADIUS,
+      y: CENTER + safeNumber(point.y, 0) * OUTER_RADIUS,
     };
   }
 
   const normalizedRadius =
-    maxPointRadius > 0 ? (point.radius / maxPointRadius) * OUTER_RADIUS : 0;
+    maxPointRadius > 0
+      ? clamp((safeNumber(point.radius, 0) / maxPointRadius) * OUTER_RADIUS, 0, OUTER_RADIUS)
+      : 0;
 
-  return polarToCartesian(normalizedRadius, point.angleDeg);
+  return polarToCartesian(normalizedRadius, safeNumber(point.angleDeg, 0));
 }
 
 export default function ClusterRadialMap({
@@ -125,19 +160,52 @@ export default function ClusterRadialMap({
     if (!radialMap) return null;
 
     const rings = normalizeRings(radialMap.rings ?? []);
-    const sectors = radialMap.sectors ?? [];
-    const points = radialMap.points ?? [];
+    const sectors = (radialMap.sectors ?? []).filter(
+      (sector) =>
+        Number.isFinite(sector.startAngleDeg) &&
+        Number.isFinite(sector.endAngleDeg),
+    );
 
-    const maxPointRadius = Math.max(...points.map((point) => point.radius), 1);
+    const rawPoints = (radialMap.points ?? []).filter((point) => {
+      const hasCartesian =
+        Number.isFinite(point.x) && Number.isFinite(point.y);
+      const hasPolar =
+        Number.isFinite(point.radius) && Number.isFinite(point.angleDeg);
+      return hasCartesian || hasPolar;
+    });
+
+    const maxPointRadius = Math.max(
+      1,
+      ...rawPoints.map((point) => safeNumber(point.radius, 0)),
+    );
 
     const cartesianLooksValid =
-      points.length > 0 &&
-      points.every(
+      rawPoints.length > 0 &&
+      rawPoints.every(
         (point) =>
           Number.isFinite(point.x) &&
           Number.isFinite(point.y) &&
-          Math.abs(point.x) <= 1.25 &&
-          Math.abs(point.y) <= 1.25,
+          Math.abs(safeNumber(point.x, 0)) <= 1.25 &&
+          Math.abs(safeNumber(point.y, 0)) <= 1.25,
+      );
+
+    const points = rawPoints
+      .map((point) => {
+        const pos = resolvePointPosition(point, maxPointRadius, cartesianLooksValid);
+        return {
+          point,
+          x: pos.x,
+          y: pos.y,
+        };
+      })
+      .filter(
+        (item) =>
+          Number.isFinite(item.x) &&
+          Number.isFinite(item.y) &&
+          item.x >= -40 &&
+          item.x <= SVG_SIZE + 40 &&
+          item.y >= -40 &&
+          item.y <= SVG_SIZE + 40,
       );
 
     return {
@@ -157,6 +225,14 @@ export default function ClusterRadialMap({
     );
   }
 
+  if (!prepared) {
+    return (
+      <div className="rounded-xl border border-dashed bg-background px-4 py-6 text-sm text-muted-foreground">
+        Radial map payload is present, but could not be prepared for rendering.
+      </div>
+    );
+  }
+
   if ((radialMap.points?.length ?? 0) === 0) {
     return (
       <div className="rounded-xl border bg-background p-4">
@@ -170,19 +246,19 @@ export default function ClusterRadialMap({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Articles</div>
-            <div className="text-sm font-medium">{radialMap.stats.articleCount}</div>
+            <div className="text-sm font-medium">{radialMap.stats?.articleCount ?? 0}</div>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Rings</div>
-            <div className="text-sm font-medium">{radialMap.ringCount}</div>
+            <div className="text-sm font-medium">{radialMap.ringCount ?? 0}</div>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Sectors</div>
-            <div className="text-sm font-medium">{radialMap.sectorCount}</div>
+            <div className="text-sm font-medium">{radialMap.sectorCount ?? 0}</div>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Subclusters</div>
-            <div className="text-sm font-medium">{radialMap.stats.subclusterCount}</div>
+            <div className="text-sm font-medium">{radialMap.stats?.subclusterCount ?? 0}</div>
           </div>
         </div>
       </div>
@@ -195,25 +271,42 @@ export default function ClusterRadialMap({
         <div>
           <h3 className="text-base font-medium">{title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ring mode {radialMap.ringMode} · sector mode {radialMap.sectorMode} · version{" "}
-            {radialMap.version}
+            Ring mode {radialMap.ringMode ?? "—"} · sector mode {radialMap.sectorMode ?? "—"} · version{" "}
+            {radialMap.version ?? "—"}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
           <div className="rounded-md border bg-card px-3 py-2">
-            Articles <span className="font-medium text-foreground">{radialMap.stats.articleCount}</span>
+            Articles{" "}
+            <span className="font-medium text-foreground">
+              {radialMap.stats?.articleCount ?? 0}
+            </span>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
-            Core <span className="font-medium text-foreground">{radialMap.stats.coreCount}</span>
+            Core{" "}
+            <span className="font-medium text-foreground">
+              {radialMap.stats?.coreCount ?? 0}
+            </span>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
-            Edge <span className="font-medium text-foreground">{radialMap.stats.edgeCount}</span>
+            Edge{" "}
+            <span className="font-medium text-foreground">
+              {radialMap.stats?.edgeCount ?? 0}
+            </span>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
-            Outliers <span className="font-medium text-foreground">{radialMap.stats.outlierCount}</span>
+            Outliers{" "}
+            <span className="font-medium text-foreground">
+              {radialMap.stats?.outlierCount ?? 0}
+            </span>
           </div>
         </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-dashed bg-card/30 px-3 py-2 text-xs text-muted-foreground">
+        Rendered: {prepared.rings.length} rings · {prepared.sectors.length} sectors ·{" "}
+        {prepared.points.length} visible points
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -226,40 +319,15 @@ export default function ClusterRadialMap({
           >
             <rect x={0} y={0} width={SVG_SIZE} height={SVG_SIZE} fill="transparent" />
 
-            {prepared?.rings.map((ring) => (
-              <g key={ring.key}>
-                <circle
-                  cx={CENTER}
-                  cy={CENTER}
-                  r={ring.outer}
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth={Math.max(1, ring.outer - ring.inner)}
-                  strokeOpacity={0.7}
-                />
-                <circle
-                  cx={CENTER}
-                  cy={CENTER}
-                  r={ring.inner}
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth={1}
-                  strokeOpacity={0.9}
-                />
-              </g>
-            ))}
-
-            {prepared?.sectors.map((sector: RadialSector) => {
+            {prepared.sectors.map((sector: RadialSector) => {
               const outerRing = prepared.rings[prepared.rings.length - 1];
               if (!outerRing) return null;
 
               const path = describeArc(
-                CENTER,
-                CENTER,
                 0,
                 outerRing.outer,
-                sector.startAngleDeg,
-                sector.endAngleDeg,
+                safeNumber(sector.startAngleDeg, 0),
+                safeNumber(sector.endAngleDeg, 0),
               );
 
               return (
@@ -272,53 +340,60 @@ export default function ClusterRadialMap({
                   strokeOpacity={0.35}
                   strokeWidth={0.8}
                 >
-                  <title>
-                    {`${sector.label} · ${sector.articleCount} articles`}
-                  </title>
+                  <title>{`${sector.label} · ${sector.articleCount} articles`}</title>
                 </path>
               );
             })}
 
-            <circle
-              cx={CENTER}
-              cy={CENTER}
-              r={2.5}
-              fill="#0f172a"
-            />
+            {prepared.rings.map((ring) => {
+              const radius = (ring.inner + ring.outer) / 2;
+              const width = Math.max(1, ring.outer - ring.inner);
 
-            {prepared?.points.map((point) => {
-              const { x, y } = resolvePointPosition(
-                point,
-                prepared.maxPointRadius,
-                prepared.useCartesian,
-              );
+              if (!Number.isFinite(radius) || radius <= 0) return null;
 
               return (
                 <circle
-                  key={`${point.articleId}-${point.articleIndex}`}
-                  cx={x}
-                  cy={y}
-                  r={getPointRadius(point)}
-                  fill={getPointColor(point)}
-                  fillOpacity={0.9}
-                  stroke="#ffffff"
-                  strokeWidth={0.8}
-                  className="cursor-pointer transition-opacity hover:opacity-100"
-                  onMouseEnter={() => setHoveredPoint(point)}
-                  onMouseLeave={() => setHoveredPoint((current) =>
+                  key={ring.key}
+                  cx={CENTER}
+                  cy={CENTER}
+                  r={radius}
+                  fill="none"
+                  stroke="#e5e7eb"
+                  strokeWidth={width}
+                  strokeOpacity={0.72}
+                />
+              );
+            })}
+
+            <circle cx={CENTER} cy={CENTER} r={2.5} fill="#0f172a" />
+
+            {prepared.points.map(({ point, x, y }) => (
+              <circle
+                key={`${point.articleId}-${point.articleIndex}`}
+                cx={x}
+                cy={y}
+                r={getPointRadius(point)}
+                fill={getPointColor(point)}
+                fillOpacity={0.9}
+                stroke="#ffffff"
+                strokeWidth={0.8}
+                className="cursor-pointer transition-opacity hover:opacity-100"
+                onMouseEnter={() => setHoveredPoint(point)}
+                onMouseLeave={() =>
+                  setHoveredPoint((current) =>
                     current?.articleId === point.articleId ? null : current,
-                  )}
-                >
-                  <title>
-                    {`Article ${point.articleId}
+                  )
+                }
+              >
+                <title>
+                  {`Article ${point.articleId}
 Ring ${point.ringIndex}
 Sector ${point.sectorIndex}
 Confidence ${formatNumber(point.membershipConfidence, 3)}
 Distance ${formatNumber(point.distanceToCentroid, 3)}`}
-                  </title>
-                </circle>
-              );
-            })}
+                </title>
+              </circle>
+            ))}
           </svg>
         </div>
 
@@ -354,23 +429,23 @@ Distance ${formatNumber(point.distanceToCentroid, 3)}`}
             <div className="mt-3 grid gap-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Mean distance</span>
-                <span>{formatNumber(radialMap.stats.distanceMean, 3)}</span>
+                <span>{formatNumber(radialMap.stats?.distanceMean, 3)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Median distance</span>
-                <span>{formatNumber(radialMap.stats.distanceMedian, 3)}</span>
+                <span>{formatNumber(radialMap.stats?.distanceMedian, 3)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Min distance</span>
-                <span>{formatNumber(radialMap.stats.distanceMin, 3)}</span>
+                <span>{formatNumber(radialMap.stats?.distanceMin, 3)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Max distance</span>
-                <span>{formatNumber(radialMap.stats.distanceMax, 3)}</span>
+                <span>{formatNumber(radialMap.stats?.distanceMax, 3)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Subclusters</span>
-                <span>{radialMap.stats.subclusterCount}</span>
+                <span>{radialMap.stats?.subclusterCount ?? 0}</span>
               </div>
             </div>
           </div>
