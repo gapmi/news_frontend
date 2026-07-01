@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef } from "react";
 import type {
   EulerPairDetail,
   GraphResponse,
@@ -117,6 +118,9 @@ export default function LineageWorkspaceTabs({
   onSelectEdge,
   onSelectCluster,
 }: Props) {
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const activeRunButtonRef = useRef<HTMLButtonElement | null>(null);
+
   const activeWindowLabel =
     timelineRunIds.length > 0
       ? `${timelineRunIds[0]} → ${timelineRunIds[timelineRunIds.length - 1]}`
@@ -126,9 +130,30 @@ export default function LineageWorkspaceTabs({
     ? `${selectedEdge.parentRunId}:${selectedEdge.parentClusterId} → ${selectedEdge.childRunId}:${selectedEdge.childClusterId}`
     : "No edge selected";
 
+  useEffect(() => {
+    if (!activeRunButtonRef.current) return;
+    activeRunButtonRef.current.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [anchorRunId, timelineRunIds]);
+
+  const scrollTimeline = (direction: "left" | "right") => {
+    const container = timelineScrollRef.current;
+    if (!container) return;
+
+    const amount = Math.max(220, Math.floor(container.clientWidth * 0.6));
+    container.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
+  const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
+
   return (
     <section className="rounded-2xl border border-border/70 bg-card shadow-sm">
-      {/* Card header */}
       <div className="border-b border-border/60 px-4 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
@@ -165,7 +190,6 @@ export default function LineageWorkspaceTabs({
           </div>
         </div>
 
-        {/* Context chips */}
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
           <div className="rounded-full border border-border/70 bg-background px-3 py-2">
             Window {activeWindowLabel}
@@ -184,21 +208,39 @@ export default function LineageWorkspaceTabs({
           </div>
         </div>
 
-        {/* Integrated controls — always close to chart */}
         <div className="mt-4 rounded-xl border border-border/70 bg-background p-3">
           <div className="grid gap-3">
-            {/* Run timeline row */}
             <div className="rounded-xl border border-border/70 bg-card px-3 py-3">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium">Run timeline</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Pick the anchor run and watch the active canvas update directly below.
+                    Pick the anchor run and scroll through the full window if runs extend beyond the visible rail.
                   </div>
                 </div>
 
-                <div className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  {timelineRunIds.length}-run window
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    {timelineRunIds.length}-run window
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => scrollTimeline("left")}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-sm text-muted-foreground transition-colors hover:bg-muted"
+                    aria-label="Scroll run timeline left"
+                  >
+                    ←
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => scrollTimeline("right")}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-sm text-muted-foreground transition-colors hover:bg-muted"
+                    aria-label="Scroll run timeline right"
+                  >
+                    →
+                  </button>
                 </div>
               </div>
 
@@ -207,44 +249,52 @@ export default function LineageWorkspaceTabs({
                   No runs available.
                 </div>
               ) : (
-                <div className="-mx-1 overflow-x-auto pb-1">
-                  <div className="flex min-w-max flex-nowrap gap-2 px-1">
-                    {timelineRunIds.map((runId) => {
-                      const isActive = anchorRunId === runId;
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent" />
 
-                      return (
-                        <button
-                          key={runId}
-                          type="button"
-                          onClick={() => onSelectRun(runId)}
-                          aria-pressed={isActive}
-                          className={[
-                            "flex h-12 w-[84px] shrink-0 flex-col items-start justify-center rounded-lg border px-3 text-left transition-colors",
-                            isActive
-                              ? "border-foreground bg-foreground text-background shadow-sm"
-                              : "border-border bg-background text-foreground hover:bg-muted/60",
-                          ].join(" ")}
-                        >
-                          <span
+                  <div
+                    ref={timelineScrollRef}
+                    className="overflow-x-auto overflow-y-hidden pb-2 [scrollbar-width:thin]"
+                  >
+                    <div className="flex w-max min-w-full flex-nowrap gap-2 pr-2">
+                      {timelineRunIds.map((runId) => {
+                        const isActive = anchorRunId === runId;
+
+                        return (
+                          <button
+                            key={runId}
+                            ref={isActive ? activeRunButtonRef : null}
+                            type="button"
+                            onClick={() => onSelectRun(runId)}
+                            aria-pressed={isActive}
                             className={[
-                              "text-[10px] uppercase tracking-[0.14em]",
-                              isActive ? "text-background/70" : "text-muted-foreground",
+                              "flex h-12 w-[84px] shrink-0 flex-col items-start justify-center rounded-lg border px-3 text-left transition-colors",
+                              isActive
+                                ? "border-foreground bg-foreground text-background shadow-sm"
+                                : "border-border bg-background text-foreground hover:bg-muted/60",
                             ].join(" ")}
                           >
-                            {isActive ? "Anchor" : "Run"}
-                          </span>
-                          <span className="mt-1 text-base font-semibold leading-none">
-                            {runId}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <span
+                              className={[
+                                "text-[10px] uppercase tracking-[0.14em]",
+                                isActive ? "text-background/70" : "text-muted-foreground",
+                              ].join(" ")}
+                            >
+                              {isActive ? "Anchor" : "Run"}
+                            </span>
+                            <span className="mt-1 text-base font-semibold leading-none">
+                              {runId}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Threshold row */}
             <div className="rounded-xl border border-border/70 bg-card px-3 py-3">
               <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_88px_auto] xl:items-end">
                 <div>
@@ -307,7 +357,7 @@ export default function LineageWorkspaceTabs({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {[0.2, 0.35, 0.42, 0.55, 0.7].map((preset) => {
+                    {thresholdPresets.map((preset) => {
                       const active = Math.abs(minScore - preset) < 0.005;
 
                       return (
@@ -342,7 +392,6 @@ export default function LineageWorkspaceTabs({
         </div>
       </div>
 
-      {/* Canvas body */}
       <div className="px-4 py-4">
         <div
           id="lineage-canvas-panel-overview"
