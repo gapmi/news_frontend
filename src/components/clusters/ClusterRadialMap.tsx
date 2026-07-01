@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type {
   ClusterRadialMap as ClusterRadialMapData,
+  ArticlePreview,
   RadialPoint,
   RadialRing,
   RadialSector,
@@ -8,6 +9,7 @@ import type {
 
 type Props = {
   radialMap: ClusterRadialMapData | null | undefined;
+  articles?: ArticlePreview[] | null | undefined;
   title?: string;
 };
 
@@ -28,6 +30,20 @@ function formatNumber(value: number | null | undefined, digits = 2) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toFixed(digits)
     : "—";
+}
+
+function formatPublishedAt(value: string | null | undefined) {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function polarToCartesian(radius: number, angleDeg: number) {
@@ -150,11 +166,28 @@ function resolvePointPosition(
   return polarToCartesian(normalizedRadius, safeNumber(point.angleDeg, 0));
 }
 
+type HoverState = {
+  point: RadialPoint;
+  x: number;
+  y: number;
+};
+
 export default function ClusterRadialMap({
   radialMap,
+  articles,
   title = "Cluster radial map",
 }: Props) {
-  const [hoveredPoint, setHoveredPoint] = useState<RadialPoint | null>(null);
+  const [hovered, setHovered] = useState<HoverState | null>(null);
+
+    const articlesById = useMemo(() => {
+    const map = new Map<number, ArticlePreview>();
+    for (const article of articles ?? []) {
+        if (typeof article.id === "number") {
+        map.set(article.id, article);
+        }
+    }
+    return map;
+    }, [articles]);
 
   const prepared = useMemo(() => {
     if (!radialMap) return null;
@@ -212,8 +245,6 @@ export default function ClusterRadialMap({
       rings,
       sectors,
       points,
-      maxPointRadius,
-      useCartesian: cartesianLooksValid,
     };
   }, [radialMap]);
 
@@ -233,41 +264,9 @@ export default function ClusterRadialMap({
     );
   }
 
-  if ((radialMap.points?.length ?? 0) === 0) {
-    return (
-      <div className="rounded-xl border bg-background p-4">
-        <div className="mb-4">
-          <h3 className="text-base font-medium">{title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Radial structure is enabled, but this cluster has no plotted points yet.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-md border bg-card px-3 py-2">
-            <div className="text-xs text-muted-foreground">Articles</div>
-            <div className="text-sm font-medium">
-              {radialMap.stats?.articleCount ?? 0}
-            </div>
-          </div>
-          <div className="rounded-md border bg-card px-3 py-2">
-            <div className="text-xs text-muted-foreground">Rings</div>
-            <div className="text-sm font-medium">{radialMap.ringCount ?? 0}</div>
-          </div>
-          <div className="rounded-md border bg-card px-3 py-2">
-            <div className="text-xs text-muted-foreground">Sectors</div>
-            <div className="text-sm font-medium">{radialMap.sectorCount ?? 0}</div>
-          </div>
-          <div className="rounded-md border bg-card px-3 py-2">
-            <div className="text-xs text-muted-foreground">Subclusters</div>
-            <div className="text-sm font-medium">
-              {radialMap.stats?.subclusterCount ?? 0}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const hoveredArticle = hovered
+    ? articlesById.get(hovered.point.articleId)
+    : null;
 
   return (
     <section className="rounded-xl border bg-background p-4">
@@ -313,14 +312,14 @@ export default function ClusterRadialMap({
         {prepared.points.length} visible points
       </div>
 
-      {/* Главное: карта во всю ширину инспектора, без второго столбца */}
       <div className="space-y-4">
-        <div className="rounded-xl border bg-card/40 p-3">
+        <div className="relative rounded-xl border bg-card/40 p-3">
           <svg
             viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
             className="mx-auto h-auto w-full max-w-[520px]"
             role="img"
             aria-label="Cluster radial map"
+            onMouseLeave={() => setHovered(null)}
           >
             <rect x={0} y={0} width={SVG_SIZE} height={SVG_SIZE} fill="transparent" />
 
@@ -344,9 +343,7 @@ export default function ClusterRadialMap({
                   stroke="#cbd5e1"
                   strokeOpacity={0.35}
                   strokeWidth={0.8}
-                >
-                  <title>{`${sector.label} · ${sector.articleCount} articles`}</title>
-                </path>
+                />
               );
             })}
 
@@ -383,26 +380,40 @@ export default function ClusterRadialMap({
                 stroke="#ffffff"
                 strokeWidth={0.8}
                 className="cursor-pointer transition-opacity hover:opacity-100"
-                onMouseEnter={() => setHoveredPoint(point)}
-                onMouseLeave={() =>
-                  setHoveredPoint((current) =>
-                    current?.articleId === point.articleId ? null : current,
-                  )
-                }
-              >
-                <title>
-                  {`Article ${point.articleId}
-Ring ${point.ringIndex}
-Sector ${point.sectorIndex}
-Confidence ${formatNumber(
-                    point.membershipConfidence,
-                    3,
-                  )}
-Distance ${formatNumber(point.distanceToCentroid, 3)}`}
-                </title>
-              </circle>
+                onMouseEnter={() => setHovered({ point, x, y })}
+                onMouseMove={() => setHovered({ point, x, y })}
+              />
             ))}
           </svg>
+
+          {hovered ? (
+            <div
+              className="pointer-events-none absolute z-20 max-w-[320px] rounded-lg border border-border/80 bg-background/95 px-3 py-3 shadow-lg backdrop-blur"
+              style={{
+                left: `min(calc(${(hovered.x / SVG_SIZE) * 100}% + 16px), calc(100% - 336px))`,
+                top: `min(calc(${(hovered.y / SVG_SIZE) * 100}% + 16px), calc(100% - 132px))`,
+              }}
+            >
+              <div className="line-clamp-3 text-sm font-medium leading-5 text-foreground">
+                {hoveredArticle?.title ?? `Article ${hovered.point.articleId}`}
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>{hoveredArticle?.source ?? "Unknown source"}</span>
+                <span>{formatPublishedAt(hoveredArticle?.published)}</span>
+              </div>
+
+              <div className="mt-3 grid gap-1 text-[11px] text-muted-foreground">
+                <div>
+                  Ring {hovered.point.ringIndex} · Sector {hovered.point.sectorIndex}
+                </div>
+                <div>
+                  Confidence {formatNumber(hovered.point.membershipConfidence, 3)} ·
+                  Distance {formatNumber(hovered.point.distanceToCentroid, 3)}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -461,32 +472,46 @@ Distance ${formatNumber(point.distanceToCentroid, 3)}`}
 
         <div className="rounded-xl border bg-card/40 p-3">
           <div className="text-sm font-medium">Hovered point</div>
-          {hoveredPoint ? (
+          {hovered ? (
             <div className="mt-3 grid gap-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Article</span>
-                <span>{hoveredPoint.articleId}</span>
+                <span>{hovered.point.articleId}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Title</span>
+                <span className="max-w-[220px] truncate text-right">
+                  {hoveredArticle?.title ?? "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Source</span>
+                <span>{hoveredArticle?.source ?? "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Published</span>
+                <span>{formatPublishedAt(hoveredArticle?.published)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Subcluster</span>
-                <span>{hoveredPoint.subclusterLabel ?? "—"}</span>
+                <span>{hovered.point.subclusterLabel ?? "—"}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Confidence</span>
-                <span>{formatNumber(hoveredPoint.membershipConfidence, 3)}</span>
+                <span>{formatNumber(hovered.point.membershipConfidence, 3)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Distance</span>
-                <span>{formatNumber(hoveredPoint.distanceToCentroid, 3)}</span>
+                <span>{formatNumber(hovered.point.distanceToCentroid, 3)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Outlier score</span>
-                <span>{formatNumber(hoveredPoint.outlierScore, 3)}</span>
+                <span>{formatNumber(hovered.point.outlierScore, 3)}</span>
               </div>
             </div>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">
-              Hover a point to inspect its membership and distance metrics.
+              Hover a point to inspect article metadata and membership metrics.
             </p>
           )}
         </div>
