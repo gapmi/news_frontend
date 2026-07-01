@@ -44,24 +44,28 @@ const modeMeta: Record<
 > = {
   overview: {
     title: "Lineage overview",
-    helper: "Runs and threshold update the Sankey immediately in the same viewport.",
+    helper: "Runs and threshold update the Sankey directly below.",
     empty: "No lineage overview data available for the selected run window.",
   },
   graph: {
     title: "Pair graph",
-    helper: "Use the same run window and threshold, but inspect the pair-level graph separately.",
+    helper: "Same controls, separate graph view for pair-level inspection.",
     empty: "No pair graph data available for the current run window.",
   },
   overlap: {
     title: "Overlap detail",
-    helper: "Selected edge explanation stays in a dedicated view, separate from cluster structure.",
+    helper: "Selected edge explanation stays isolated from cluster structure.",
     empty: "Select an edge in overview or pair graph to open overlap detail.",
   },
 };
 
+function clampScore(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
 function formatScore(value: number) {
-  const safeValue = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
-  return safeValue.toFixed(2);
+  return clampScore(value).toFixed(2);
 }
 
 function TabButton({
@@ -89,13 +93,50 @@ function TabButton({
       tabIndex={selected ? 0 : -1}
       onClick={() => onChange(value)}
       className={[
-        "min-h-10 rounded-lg border px-3 text-sm font-medium transition-colors",
+        "inline-flex min-h-9 items-center rounded-lg border px-3 text-sm font-medium transition-colors",
         selected
           ? "border-foreground bg-foreground text-background"
           : "border-border bg-background text-muted-foreground hover:bg-muted",
       ].join(" ")}
     >
       {children}
+    </button>
+  );
+}
+
+function RunChip({
+  runId,
+  active,
+  onClick,
+  buttonRef,
+}: {
+  runId: number;
+  active: boolean;
+  onClick: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={[
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm transition-colors",
+        active
+          ? "border-foreground bg-foreground text-background shadow-sm"
+          : "border-border bg-background text-foreground hover:bg-muted/60",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "text-[10px] uppercase tracking-[0.14em]",
+          active ? "text-background/70" : "text-muted-foreground",
+        ].join(" ")}
+      >
+        {active ? "Anchor" : "Run"}
+      </span>
+      <span className="font-semibold leading-none">{runId}</span>
     </button>
   );
 }
@@ -121,6 +162,8 @@ export default function LineageWorkspaceTabs({
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const activeRunButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  const safeScore = clampScore(minScore);
+
   const activeWindowLabel =
     timelineRunIds.length > 0
       ? `${timelineRunIds[0]} → ${timelineRunIds[timelineRunIds.length - 1]}`
@@ -129,6 +172,8 @@ export default function LineageWorkspaceTabs({
   const activePairLabel = selectedEdge
     ? `${selectedEdge.parentRunId}:${selectedEdge.parentClusterId} → ${selectedEdge.childRunId}:${selectedEdge.childClusterId}`
     : "No edge selected";
+
+  const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
 
   useEffect(() => {
     if (!activeRunButtonRef.current) return;
@@ -143,91 +188,75 @@ export default function LineageWorkspaceTabs({
     const container = timelineScrollRef.current;
     if (!container) return;
 
-    const amount = Math.max(220, Math.floor(container.clientWidth * 0.6));
+    const amount = Math.max(220, Math.floor(container.clientWidth * 0.75));
     container.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
     });
   };
 
-  const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
-
   return (
     <section className="rounded-2xl border border-border/70 bg-card shadow-sm">
+      {/* Header */}
       <div className="border-b border-border/60 px-4 py-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
             <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
               Analysis stage
             </div>
-
-            <div className="mt-2 flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  {modeMeta[mode].title}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {modeMeta[mode].helper}
-                </p>
-              </div>
-
-              <div
-                className="flex flex-wrap gap-2"
-                role="tablist"
-                aria-label="Lineage canvas modes"
-              >
-                <TabButton value="overview" activeValue={mode} onChange={onChangeMode}>
-                  Overview
-                </TabButton>
-                <TabButton value="graph" activeValue={mode} onChange={onChangeMode}>
-                  Pair graph
-                </TabButton>
-                <TabButton value="overlap" activeValue={mode} onChange={onChangeMode}>
-                  Overlap
-                </TabButton>
-              </div>
+            <div className="mt-2">
+              <h2 className="text-lg font-semibold tracking-tight">
+                {modeMeta[mode].title}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {modeMeta[mode].helper}
+              </p>
             </div>
           </div>
+
+          <div
+            className="flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="Lineage canvas modes"
+          >
+            <TabButton value="overview" activeValue={mode} onChange={onChangeMode}>
+              Overview
+            </TabButton>
+            <TabButton value="graph" activeValue={mode} onChange={onChangeMode}>
+              Pair graph
+            </TabButton>
+            <TabButton value="overlap" activeValue={mode} onChange={onChangeMode}>
+              Overlap
+            </TabButton>
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <div className="rounded-full border border-border/70 bg-background px-3 py-2">
-            Window {activeWindowLabel}
-          </div>
-          <div className="rounded-full border border-border/70 bg-background px-3 py-2">
-            Anchor {anchorRunId ?? "—"}
-          </div>
-          <div className="rounded-full border border-border/70 bg-background px-3 py-2">
-            Threshold {formatScore(minScore)}
-          </div>
-          <div className="rounded-full border border-border/70 bg-background px-3 py-2">
-            Pair edges {activeEdgeIds.size}
-          </div>
-          <div className="rounded-full border border-border/70 bg-background px-3 py-2">
-            {activePairLabel}
-          </div>
+        {/* Compact meta line */}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>Window {activeWindowLabel}</span>
+          <span>Anchor {anchorRunId ?? "—"}</span>
+          <span>Threshold {formatScore(safeScore)}</span>
+          <span>Pair edges {activeEdgeIds.size}</span>
+          <span>{activePairLabel}</span>
         </div>
 
-        <div className="mt-4 rounded-xl border border-border/70 bg-background p-3">
-          <div className="grid gap-3">
-            <div className="rounded-xl border border-border/70 bg-card px-3 py-3">
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium">Run timeline</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Pick the anchor run and scroll through the full window if runs extend beyond the visible rail.
-                  </div>
-                </div>
+        {/* Single compact command bar */}
+        <div className="mt-4 rounded-xl border border-border/70 bg-background px-3 py-3">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+            {/* Run rail */}
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-medium">Run timeline</div>
 
                 <div className="flex items-center gap-2">
-                  <div className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     {timelineRunIds.length}-run window
                   </div>
 
                   <button
                     type="button"
                     onClick={() => scrollTimeline("left")}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-sm text-muted-foreground transition-colors hover:bg-muted"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-sm text-muted-foreground transition-colors hover:bg-muted"
                     aria-label="Scroll run timeline left"
                   >
                     ←
@@ -236,7 +265,7 @@ export default function LineageWorkspaceTabs({
                   <button
                     type="button"
                     onClick={() => scrollTimeline("right")}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-sm text-muted-foreground transition-colors hover:bg-muted"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-sm text-muted-foreground transition-colors hover:bg-muted"
                     aria-label="Scroll run timeline right"
                   >
                     →
@@ -245,48 +274,30 @@ export default function LineageWorkspaceTabs({
               </div>
 
               {timelineRunIds.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
                   No runs available.
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent" />
-                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent" />
+                <div className="relative min-w-0">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-background to-transparent" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-background to-transparent" />
 
                   <div
                     ref={timelineScrollRef}
-                    className="overflow-x-auto overflow-y-hidden pb-2 [scrollbar-width:thin]"
+                    className="overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"
                   >
                     <div className="flex w-max min-w-full flex-nowrap gap-2 pr-2">
                       {timelineRunIds.map((runId) => {
                         const isActive = anchorRunId === runId;
 
                         return (
-                          <button
+                          <RunChip
                             key={runId}
-                            ref={isActive ? activeRunButtonRef : null}
-                            type="button"
+                            runId={runId}
+                            active={isActive}
                             onClick={() => onSelectRun(runId)}
-                            aria-pressed={isActive}
-                            className={[
-                              "flex h-12 w-[84px] shrink-0 flex-col items-start justify-center rounded-lg border px-3 text-left transition-colors",
-                              isActive
-                                ? "border-foreground bg-foreground text-background shadow-sm"
-                                : "border-border bg-background text-foreground hover:bg-muted/60",
-                            ].join(" ")}
-                          >
-                            <span
-                              className={[
-                                "text-[10px] uppercase tracking-[0.14em]",
-                                isActive ? "text-background/70" : "text-muted-foreground",
-                              ].join(" ")}
-                            >
-                              {isActive ? "Anchor" : "Run"}
-                            </span>
-                            <span className="mt-1 text-base font-semibold leading-none">
-                              {runId}
-                            </span>
-                          </button>
+                            buttonRef={isActive ? activeRunButtonRef : undefined}
+                          />
                         );
                       })}
                     </div>
@@ -295,70 +306,50 @@ export default function LineageWorkspaceTabs({
               )}
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-card px-3 py-3">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_88px_auto] xl:items-end">
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <label
-                      htmlFor="lineage-min-score-range"
-                      className="text-sm font-medium"
-                    >
-                      Threshold controls
-                    </label>
+            {/* Threshold cluster */}
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-medium">Threshold</div>
+                <div className="rounded-md border border-border/70 bg-card px-2.5 py-1.5 text-sm font-medium">
+                  {formatScore(safeScore)}
+                </div>
+              </div>
 
-                    <div className="rounded-md border border-border/70 bg-background px-2.5 py-1.5 text-sm font-medium">
-                      {formatScore(minScore)}
-                    </div>
-                  </div>
+              <div className="grid gap-2">
+                <input
+                  id="lineage-min-score-range"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={safeScore}
+                  onChange={(event) => onChangeMinScore(Number(event.target.value))}
+                  className="w-full accent-foreground"
+                  aria-label="Minimum lineage edge score"
+                />
 
-                  <input
-                    id="lineage-min-score-range"
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={minScore}
-                    onChange={(event) => onChangeMinScore(Number(event.target.value))}
-                    className="w-full accent-foreground"
-                    aria-label="Minimum lineage edge score"
-                  />
-
-                  <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                    <span>0.00</span>
-                    <span>0.50</span>
-                    <span>1.00</span>
-                  </div>
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>0.00</span>
+                  <span>0.50</span>
+                  <span>1.00</span>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="lineage-min-score-input"
-                    className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
-                  >
-                    Exact
-                  </label>
-
+                <div className="flex items-center gap-2">
                   <input
                     id="lineage-min-score-input"
                     type="number"
                     min={0}
                     max={1}
                     step={0.01}
-                    value={minScore}
+                    value={safeScore}
                     onChange={(event) => onChangeMinScore(Number(event.target.value))}
-                    className="flex h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-foreground"
+                    className="h-9 w-20 rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-foreground"
                     aria-label="Minimum score numeric input"
                   />
-                </div>
-
-                <div>
-                  <div className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    Presets
-                  </div>
 
                   <div className="flex flex-wrap gap-2">
                     {thresholdPresets.map((preset) => {
-                      const active = Math.abs(minScore - preset) < 0.005;
+                      const active = Math.abs(safeScore - preset) < 0.005;
 
                       return (
                         <button
@@ -366,10 +357,10 @@ export default function LineageWorkspaceTabs({
                           type="button"
                           onClick={() => onChangeMinScore(preset)}
                           className={[
-                            "min-h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                            "min-h-8 rounded-full border px-3 text-xs font-medium transition-colors",
                             active
                               ? "border-foreground bg-foreground text-background"
-                              : "border-border bg-background text-muted-foreground hover:bg-muted",
+                              : "border-border bg-card text-muted-foreground hover:bg-muted",
                           ].join(" ")}
                         >
                           {preset.toFixed(2)}
@@ -380,7 +371,7 @@ export default function LineageWorkspaceTabs({
                     <button
                       type="button"
                       onClick={() => onChangeMinScore(0.42)}
-                      className="min-h-9 rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                      className="min-h-8 rounded-full border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                     >
                       Reset
                     </button>
@@ -392,6 +383,7 @@ export default function LineageWorkspaceTabs({
         </div>
       </div>
 
+      {/* Canvas */}
       <div className="px-4 py-4">
         <div
           id="lineage-canvas-panel-overview"
@@ -401,15 +393,24 @@ export default function LineageWorkspaceTabs({
         >
           {mode === "overview" ? (
             sankeyData ? (
-              <div className="rounded-xl border border-border/70 bg-background p-2">
-                <MultiRunSankey
-                  data={sankeyData}
-                  selectedEdgeId={selectedEdgeId}
-                  activeEdgeIds={activeEdgeIds}
-                  focusedRunId={focusedRunId}
-                  onSelectEdge={onSelectEdge}
-                  onSelectCluster={onSelectCluster}
-                />
+              <div className="rounded-xl border border-border/70 bg-background">
+                <div className="border-b border-border/60 px-4 py-3">
+                  <div className="text-sm font-medium">Multi-run lineage</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Runs {activeWindowLabel}. Controls above affect this chart directly.
+                  </div>
+                </div>
+
+                <div className="p-2">
+                  <MultiRunSankey
+                    data={sankeyData}
+                    selectedEdgeId={selectedEdgeId}
+                    activeEdgeIds={activeEdgeIds}
+                    focusedRunId={focusedRunId}
+                    onSelectEdge={onSelectEdge}
+                    onSelectCluster={onSelectCluster}
+                  />
+                </div>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 px-4 py-10 text-sm text-muted-foreground">
@@ -427,15 +428,24 @@ export default function LineageWorkspaceTabs({
         >
           {mode === "graph" ? (
             graphData ? (
-              <div className="rounded-xl border border-border/70 bg-background p-2">
-                <LineageFlow
-                  data={graphData}
-                  selectedEdgeId={selectedEdgeId}
-                  selectedRunId={focusedRunId}
-                  activeEdgeIds={activeEdgeIds}
-                  onSelectEdge={onSelectEdge}
-                  onSelectCluster={onSelectCluster}
-                />
+              <div className="rounded-xl border border-border/70 bg-background">
+                <div className="border-b border-border/60 px-4 py-3">
+                  <div className="text-sm font-medium">Pair graph</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Same window and threshold, separate graph-level inspection.
+                  </div>
+                </div>
+
+                <div className="p-2">
+                  <LineageFlow
+                    data={graphData}
+                    selectedEdgeId={selectedEdgeId}
+                    selectedRunId={focusedRunId}
+                    activeEdgeIds={activeEdgeIds}
+                    onSelectEdge={onSelectEdge}
+                    onSelectCluster={onSelectCluster}
+                  />
+                </div>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 px-4 py-10 text-sm text-muted-foreground">
@@ -454,8 +464,17 @@ export default function LineageWorkspaceTabs({
           {mode === "overlap" ? (
             eulerDetail ? (
               <div className="space-y-4">
-                <div className="rounded-xl border border-border/70 bg-background p-2">
-                  <EulerOverlapDiagram detail={eulerDetail} />
+                <div className="rounded-xl border border-border/70 bg-background">
+                  <div className="border-b border-border/60 px-4 py-3">
+                    <div className="text-sm font-medium">Overlap detail</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Selected edge explanation separated from cluster structure.
+                    </div>
+                  </div>
+
+                  <div className="p-2">
+                    <EulerOverlapDiagram detail={eulerDetail} />
+                  </div>
                 </div>
 
                 {selectedEdge ? (
