@@ -402,17 +402,6 @@ export default function LineageDashboard() {
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
           <div className="space-y-5">
-            <LineageTopToolbar
-              timelineRunIds={windowRunIds}
-              anchorRunId={anchorRunId}
-              minScore={minScore}
-              onSelectRun={(runId) => {
-                setAnchorRunId(runId);
-              }}
-              onChangeMinScore={(value) => {
-                setMinScore(value);
-              }}
-            />
 
             {isPageLoading ? (
               <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
@@ -423,7 +412,7 @@ export default function LineageDashboard() {
                 </div>
               </section>
             ) : (
-              <LineageWorkspaceTabs
+                <LineageWorkspaceTabs
                 mode={canvasMode}
                 onChangeMode={setCanvasMode}
                 sankeyData={sankeyQuery.data ?? null}
@@ -433,14 +422,23 @@ export default function LineageDashboard() {
                 selectedEdgeId={selectedEdgeId}
                 activeEdgeIds={activeEdgeIds}
                 focusedRunId={anchorRunId}
+                timelineRunIds={windowRunIds}
+                anchorRunId={anchorRunId}
+                minScore={minScore}
+                onSelectRun={(runId) => {
+                    setAnchorRunId(runId);
+                }}
+                onChangeMinScore={(value) => {
+                    setMinScore(value);
+                }}
                 onSelectEdge={(edgeId) => {
-                  setSelectedEdgeId(edgeId);
-                  setCanvasMode("overlap");
+                    setSelectedEdgeId(edgeId);
+                    setCanvasMode("overlap");
                 }}
                 onSelectCluster={(runId, clusterId, label) => {
-                  setSelectedCluster({ runId, clusterId, label });
+                    setSelectedCluster({ runId, clusterId, label });
                 }}
-              />
+                />
             )}
           </div>
 
