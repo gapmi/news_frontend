@@ -12,7 +12,6 @@ import {
   type LineageEdge,
 } from "@/api/clustering";
 import { getLineageWindow } from "@/utils/lineageWindow";
-import LineageTopToolbar from "@/components/lineage/LineageTopToolbar";
 import LineageWorkspaceTabs, {
   type CanvasMode,
 } from "@/components/lineage/LineageWorkspaceTabs";
@@ -46,8 +45,11 @@ function formatRelativePipelineTime(value: string | null | undefined) {
 export default function LineageDashboard() {
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("overview");
   const [anchorRunId, setAnchorRunId] = useState<number | null>(null);
+
+  // Два уровня threshold: draft (UI) и applied (для запросов)
   const [appliedMinScore, setAppliedMinScore] = useState<number>(0.42);
   const [draftMinScore, setDraftMinScore] = useState<number>(0.42);
+
   const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const [selectedCluster, setSelectedCluster] =
     useState<SelectedClusterState | null>(null);
@@ -107,47 +109,47 @@ export default function LineageDashboard() {
   const endRunId = lineageWindow?.endRunId ?? anchorRunId ?? 0;
   const windowRunIds = lineageWindow?.runIds ?? allRunIds;
 
-    const sankeyQuery = useQuery({
+  const sankeyQuery = useQuery({
     queryKey:
-        startRunId && endRunId
+      startRunId && endRunId
         ? clusteringKeys.sankey({
             start_run_id: startRunId,
             end_run_id: endRunId,
             min_score: appliedMinScore,
-            })
+          })
         : [...clusteringKeys.all, "views", "sankey", "disabled"],
     queryFn: () =>
-        getSankeyView({
+      getSankeyView({
         start_run_id: startRunId,
         end_run_id: endRunId,
         min_score: appliedMinScore,
-        }),
+      }),
     enabled: startRunId > 0 && endRunId > 0,
     staleTime: 30_000,
-    });
+  });
 
-const graphQuery = useQuery({
-  queryKey:
-    startRunId && endRunId
-      ? clusteringKeys.graph({
-          start_run_id: startRunId,
-          end_run_id: endRunId,
-          min_score: appliedMinScore,
-          max_nodes: 120,
-          max_edges: 240,
-        })
-      : [...clusteringKeys.all, "views", "graph", "disabled"],
-  queryFn: () =>
-    getGraphView({
-      start_run_id: startRunId,
-      end_run_id: endRunId,
-      min_score: appliedMinScore,
-      max_nodes: 120,
-      max_edges: 240,
-    }),
-  enabled: startRunId > 0 && endRunId > 0,
-  staleTime: 30_000,
-});
+  const graphQuery = useQuery({
+    queryKey:
+      startRunId && endRunId
+        ? clusteringKeys.graph({
+            start_run_id: startRunId,
+            end_run_id: endRunId,
+            min_score: appliedMinScore,
+            max_nodes: 120,
+            max_edges: 240,
+          })
+        : [...clusteringKeys.all, "views", "graph", "disabled"],
+    queryFn: () =>
+      getGraphView({
+        start_run_id: startRunId,
+        end_run_id: endRunId,
+        min_score: appliedMinScore,
+        max_nodes: 120,
+        max_edges: 240,
+      }),
+    enabled: startRunId > 0 && endRunId > 0,
+    staleTime: 30_000,
+  });
 
   const activePair = useMemo(() => {
     if (selectedEdgeId && sankeyQuery.data?.links) {
@@ -193,27 +195,27 @@ const graphQuery = useQuery({
     return null;
   }, [selectedEdgeId, sankeyQuery.data, anchorRunId, allRunIds]);
 
-    const lineageEdgesQuery = useQuery({
+  const lineageEdgesQuery = useQuery({
     queryKey: activePair
-        ? clusteringKeys.lineageEdges({
-            parent_run_id: activePair.parentRunId,
-            child_run_id: activePair.childRunId,
-            min_score: appliedMinScore,
-            limit: 500,
-            sort: "score_desc",
+      ? clusteringKeys.lineageEdges({
+          parent_run_id: activePair.parentRunId,
+          child_run_id: activePair.childRunId,
+          min_score: appliedMinScore,
+          limit: 500,
+          sort: "score_desc",
         })
-        : [...clusteringKeys.all, "lineage", "edges", "disabled"],
+      : [...clusteringKeys.all, "lineage", "edges", "disabled"],
     queryFn: () =>
-        getLineageEdges({
+      getLineageEdges({
         parent_run_id: activePair!.parentRunId,
         child_run_id: activePair!.childRunId,
         min_score: appliedMinScore,
         limit: 500,
         sort: "score_desc",
-        }),
+      }),
     enabled: !!activePair,
     staleTime: 30_000,
-    });
+  });
 
   const activeEdgeIds = useMemo(() => {
     return new Set((lineageEdgesQuery.data?.items ?? []).map((edge) => edge.edgeId));
@@ -282,15 +284,17 @@ const graphQuery = useQuery({
             ? graphQuery.error.message
             : null;
 
-    const isInitialPageLoading =
+  // initial loading — только первый заход
+  const isInitialPageLoading =
     runsQuery.isLoading ||
     pipelineRunsQuery.isLoading ||
     (anchorRunId !== null &&
-        !sankeyQuery.data &&
-        !graphQuery.data &&
-        (sankeyQuery.isLoading || graphQuery.isLoading));
+      !sankeyQuery.data &&
+      !graphQuery.data &&
+      (sankeyQuery.isLoading || graphQuery.isLoading));
 
-    const isStageFetching =
+  // background refetch — без skeleton, с overlay
+  const isStageFetching =
     sankeyQuery.isFetching || graphQuery.isFetching || lineageEdgesQuery.isFetching;
 
   const hasNoRuns =
@@ -300,6 +304,7 @@ const graphQuery = useQuery({
 
   return (
     <div className="space-y-5">
+      {/* Верхний header (Analysis workspace) */}
       <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <div className="grid gap-5 xl:grid-cols-[1.2fr_1fr_auto] xl:items-center">
           <div>
@@ -409,49 +414,49 @@ const graphQuery = useQuery({
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
           <div className="space-y-5">
-    {isInitialPageLoading ? (
-    <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-        <div className="space-y-4">
-        <div className="h-11 w-[360px] animate-pulse rounded-xl bg-muted/50" />
-        <div className="h-6 w-[280px] animate-pulse rounded-md bg-muted/50" />
-        <div className="h-[640px] animate-pulse rounded-xl border border-border/70 bg-muted/30" />
-        </div>
-    </section>
-    ) : (
-    <LineageWorkspaceTabs
-        mode={canvasMode}
-        onChangeMode={setCanvasMode}
-        sankeyData={sankeyQuery.data ?? null}
-        graphData={graphQuery.data ?? null}
-        eulerDetail={eulerDetailQuery.data ?? null}
-        selectedEdge={selectedEdge}
-        selectedEdgeId={selectedEdgeId}
-        activeEdgeIds={activeEdgeIds}
-        focusedRunId={anchorRunId}
-        timelineRunIds={windowRunIds}
-        anchorRunId={anchorRunId}
-        minScore={draftMinScore}
-        appliedMinScore={appliedMinScore}
-        isFetching={isStageFetching}
-        onSelectRun={(runId) => {
-        setAnchorRunId(runId);
-        }}
-        onChangeMinScoreDraft={(value) => {
-        setDraftMinScore(value);
-        }}
-        onCommitMinScore={(value) => {
-        setDraftMinScore(value);
-        setAppliedMinScore(value);
-        }}
-        onSelectEdge={(edgeId) => {
-        setSelectedEdgeId(edgeId);
-        setCanvasMode("overlap");
-        }}
-        onSelectCluster={(runId, clusterId, label) => {
-        setSelectedCluster({ runId, clusterId, label });
-        }}
-    />
-    )}
+            {isInitialPageLoading ? (
+              <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+                <div className="space-y-4">
+                  <div className="h-11 w-[360px] animate-pulse rounded-xl bg-muted/50" />
+                  <div className="h-6 w-[280px] animate-pulse rounded-md bg-muted/50" />
+                  <div className="h-[640px] animate-pulse rounded-xl border border-border/70 bg-muted/30" />
+                </div>
+              </section>
+            ) : (
+              <LineageWorkspaceTabs
+                mode={canvasMode}
+                onChangeMode={setCanvasMode}
+                sankeyData={sankeyQuery.data ?? null}
+                graphData={graphQuery.data ?? null}
+                eulerDetail={eulerDetailQuery.data ?? null}
+                selectedEdge={selectedEdge}
+                selectedEdgeId={selectedEdgeId}
+                activeEdgeIds={activeEdgeIds}
+                focusedRunId={anchorRunId}
+                timelineRunIds={windowRunIds}
+                anchorRunId={anchorRunId}
+                minScore={draftMinScore}
+                appliedMinScore={appliedMinScore}
+                isFetching={isStageFetching}
+                onSelectRun={(runId) => {
+                  setAnchorRunId(runId);
+                }}
+                onChangeMinScoreDraft={(value) => {
+                  setDraftMinScore(value);
+                }}
+                onCommitMinScore={(value) => {
+                  setDraftMinScore(value);
+                  setAppliedMinScore(value);
+                }}
+                onSelectEdge={(edgeId) => {
+                  setSelectedEdgeId(edgeId);
+                  setCanvasMode("overlap");
+                }}
+                onSelectCluster={(runId, clusterId, label) => {
+                  setSelectedCluster({ runId, clusterId, label });
+                }}
+              />
+            )}
           </div>
 
           <LineageInspectorPane

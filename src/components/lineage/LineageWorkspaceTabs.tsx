@@ -27,7 +27,8 @@ interface Props {
   timelineRunIds: number[];
   anchorRunId: number | null;
 
-  minScore: number;
+  // threshold
+  minScore: number; // draft
   appliedMinScore: number;
   isFetching?: boolean;
 
@@ -171,7 +172,7 @@ export default function LineageWorkspaceTabs({
   const activeRunButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const safeScore = clampScore(minScore);
-const safeAppliedScore = clampScore(appliedMinScore);
+  const safeAppliedScore = clampScore(appliedMinScore);
 
   const activeWindowLabel =
     timelineRunIds.length > 0
@@ -240,16 +241,16 @@ const safeAppliedScore = clampScore(appliedMinScore);
           </div>
         </div>
 
-        {/* Compact meta line */}
+        {/* Meta line */}
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>Window {activeWindowLabel}</span>
           <span>Anchor {anchorRunId ?? "—"}</span>
-          <span>Threshold {formatScore(safeScore)}</span>
+          <span>Threshold {formatScore(safeAppliedScore)}</span>
           <span>Pair edges {activeEdgeIds.size}</span>
           <span>{activePairLabel}</span>
         </div>
 
-        {/* Single compact command bar */}
+        {/* Command bar */}
         <div className="mt-4 rounded-xl border border-border/70 bg-background px-3 py-3">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
             {/* Run rail */}
@@ -319,23 +320,55 @@ const safeAppliedScore = clampScore(appliedMinScore);
             <div className="min-w-0">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="text-sm font-medium">Threshold</div>
-                <div className="rounded-md border border-border/70 bg-card px-2.5 py-1.5 text-sm font-medium">
-                  {formatScore(safeScore)}
+                <div className="flex items-center gap-2">
+                  {Math.abs(safeScore - safeAppliedScore) > 0.0001 ? (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+                      Preview {formatScore(safeScore)}
+                    </span>
+                  ) : null}
+                  <div className="rounded-md border border-border/70 bg-card px-2.5 py-1.5 text-sm font-medium">
+                    {formatScore(safeAppliedScore)}
+                  </div>
                 </div>
               </div>
 
               <div className="grid gap-2">
                 <input
-                id="lineage-min-score-input"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                value={safeScore}
-                onChange={(event) => onChangeMinScoreDraft(Number(event.target.value))}
-                onBlur={(event) => onCommitMinScore(Number(event.target.value))}
-                className="h-9 w-20 rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-foreground"
-                aria-label="Minimum score numeric input"
+                  id="lineage-min-score-range"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={safeScore}
+                  onChange={(event) =>
+                    onChangeMinScoreDraft(Number(event.target.value))
+                  }
+                  onMouseUp={(event) =>
+                    onCommitMinScore(
+                      Number((event.target as HTMLInputElement).value),
+                    )
+                  }
+                  onTouchEnd={(event) =>
+                    onCommitMinScore(
+                      Number((event.target as HTMLInputElement).value),
+                    )
+                  }
+                  onKeyUp={(event) => {
+                    if (
+                      event.key === "ArrowLeft" ||
+                      event.key === "ArrowRight" ||
+                      event.key === "Home" ||
+                      event.key === "End" ||
+                      event.key === "PageUp" ||
+                      event.key === "PageDown"
+                    ) {
+                      onCommitMinScore(
+                        Number((event.target as HTMLInputElement).value),
+                      );
+                    }
+                  }}
+                  className="w-full accent-foreground"
+                  aria-label="Minimum lineage edge score"
                 />
 
                 <div className="flex justify-between text-[11px] text-muted-foreground">
@@ -345,46 +378,32 @@ const safeAppliedScore = clampScore(appliedMinScore);
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <input
-                    id="lineage-min-score-range"
-                    type="range"
+                  <input
+                    id="lineage-min-score-input"
+                    type="number"
                     min={0}
                     max={1}
                     step={0.01}
                     value={safeScore}
-                    onChange={(event) => onChangeMinScoreDraft(Number(event.target.value))}
-                    onMouseUp={(event) => onCommitMinScore(Number((event.target as HTMLInputElement).value))}
-                    onTouchEnd={(event) => onCommitMinScore(Number((event.target as HTMLInputElement).value))}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            onCommitMinScore(Number((event.target as HTMLInputElement).value));
-                        }
-                        }}
-                    onKeyUp={(event) => {
-                        if (
-                        event.key === "ArrowLeft" ||
-                        event.key === "ArrowRight" ||
-                        event.key === "Home" ||
-                        event.key === "End" ||
-                        event.key === "PageUp" ||
-                        event.key === "PageDown"
-                        ) {
-                        onCommitMinScore(Number((event.target as HTMLInputElement).value));
-                        }
-                    }}
-                    className="w-full accent-foreground"
-                    aria-label="Minimum lineage edge score"
-                    />
+                    onChange={(event) =>
+                      onChangeMinScoreDraft(Number(event.target.value))
+                    }
+                    onBlur={(event) =>
+                      onCommitMinScore(Number(event.target.value))
+                    }
+                    className="h-9 w-20 rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-foreground"
+                    aria-label="Minimum score numeric input"
+                  />
 
                   <div className="flex flex-wrap gap-2">
                     {thresholdPresets.map((preset) => {
-                      const active = Math.abs(safeScore - preset) < 0.005;
+                      const active = Math.abs(safeAppliedScore - preset) < 0.005;
 
                       return (
                         <button
                           key={preset}
                           type="button"
-                          onClick={() => onCommitMinScore(Number(preset))}
+                          onClick={() => onCommitMinScore(preset)}
                           className={[
                             "min-h-8 rounded-full border px-3 text-xs font-medium transition-colors",
                             active
@@ -412,16 +431,17 @@ const safeAppliedScore = clampScore(appliedMinScore);
         </div>
       </div>
 
-      {/* Canvas */}
-
-      <div className="px-4 py-4">'
-                {isFetching ? (
-            <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex justify-end">
+      {/* Canvas + overlay для background fetching */}
+      <div className="relative px-4 py-4">
+        {isFetching ? (
+          <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex justify-end">
             <div className="rounded-full border border-border/70 bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-                Updating…
+              Updating…
             </div>
-            </div>
+          </div>
         ) : null}
+
+        {/* Overview */}
         <div
           id="lineage-canvas-panel-overview"
           role="tabpanel"
@@ -457,6 +477,7 @@ const safeAppliedScore = clampScore(appliedMinScore);
           ) : null}
         </div>
 
+        {/* Graph */}
         <div
           id="lineage-canvas-panel-graph"
           role="tabpanel"
@@ -492,6 +513,7 @@ const safeAppliedScore = clampScore(appliedMinScore);
           ) : null}
         </div>
 
+        {/* Overlap */}
         <div
           id="lineage-canvas-panel-overlap"
           role="tabpanel"
