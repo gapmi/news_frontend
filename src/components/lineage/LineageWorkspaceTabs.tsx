@@ -26,9 +26,14 @@ interface Props {
 
   timelineRunIds: number[];
   anchorRunId: number | null;
+
   minScore: number;
+  appliedMinScore: number;
+  isFetching?: boolean;
+
   onSelectRun: (runId: number) => void;
-  onChangeMinScore: (value: number) => void;
+  onChangeMinScoreDraft: (value: number) => void;
+  onCommitMinScore: (value: number) => void;
 
   onSelectEdge?: (edgeId: number) => void;
   onSelectCluster?: (runId: number, clusterId: number, label?: string | null) => void;
@@ -154,8 +159,11 @@ export default function LineageWorkspaceTabs({
   timelineRunIds,
   anchorRunId,
   minScore,
+  appliedMinScore,
+  isFetching = false,
   onSelectRun,
-  onChangeMinScore,
+  onChangeMinScoreDraft,
+  onCommitMinScore,
   onSelectEdge,
   onSelectCluster,
 }: Props) {
@@ -163,6 +171,7 @@ export default function LineageWorkspaceTabs({
   const activeRunButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const safeScore = clampScore(minScore);
+const safeAppliedScore = clampScore(appliedMinScore);
 
   const activeWindowLabel =
     timelineRunIds.length > 0
@@ -317,15 +326,16 @@ export default function LineageWorkspaceTabs({
 
               <div className="grid gap-2">
                 <input
-                  id="lineage-min-score-range"
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={safeScore}
-                  onChange={(event) => onChangeMinScore(Number(event.target.value))}
-                  className="w-full accent-foreground"
-                  aria-label="Minimum lineage edge score"
+                id="lineage-min-score-input"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={safeScore}
+                onChange={(event) => onChangeMinScoreDraft(Number(event.target.value))}
+                onBlur={(event) => onCommitMinScore(Number(event.target.value))}
+                className="h-9 w-20 rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-foreground"
+                aria-label="Minimum score numeric input"
                 />
 
                 <div className="flex justify-between text-[11px] text-muted-foreground">
@@ -335,17 +345,36 @@ export default function LineageWorkspaceTabs({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <input
-                    id="lineage-min-score-input"
-                    type="number"
+                    <input
+                    id="lineage-min-score-range"
+                    type="range"
                     min={0}
                     max={1}
                     step={0.01}
                     value={safeScore}
-                    onChange={(event) => onChangeMinScore(Number(event.target.value))}
-                    className="h-9 w-20 rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-foreground"
-                    aria-label="Minimum score numeric input"
-                  />
+                    onChange={(event) => onChangeMinScoreDraft(Number(event.target.value))}
+                    onMouseUp={(event) => onCommitMinScore(Number((event.target as HTMLInputElement).value))}
+                    onTouchEnd={(event) => onCommitMinScore(Number((event.target as HTMLInputElement).value))}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            onCommitMinScore(Number((event.target as HTMLInputElement).value));
+                        }
+                        }}
+                    onKeyUp={(event) => {
+                        if (
+                        event.key === "ArrowLeft" ||
+                        event.key === "ArrowRight" ||
+                        event.key === "Home" ||
+                        event.key === "End" ||
+                        event.key === "PageUp" ||
+                        event.key === "PageDown"
+                        ) {
+                        onCommitMinScore(Number((event.target as HTMLInputElement).value));
+                        }
+                    }}
+                    className="w-full accent-foreground"
+                    aria-label="Minimum lineage edge score"
+                    />
 
                   <div className="flex flex-wrap gap-2">
                     {thresholdPresets.map((preset) => {
@@ -355,7 +384,7 @@ export default function LineageWorkspaceTabs({
                         <button
                           key={preset}
                           type="button"
-                          onClick={() => onChangeMinScore(preset)}
+                          onClick={() => onCommitMinScore(Number(preset))}
                           className={[
                             "min-h-8 rounded-full border px-3 text-xs font-medium transition-colors",
                             active
@@ -370,7 +399,7 @@ export default function LineageWorkspaceTabs({
 
                     <button
                       type="button"
-                      onClick={() => onChangeMinScore(0.42)}
+                      onClick={() => onCommitMinScore(0.42)}
                       className="min-h-8 rounded-full border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                     >
                       Reset
@@ -384,7 +413,15 @@ export default function LineageWorkspaceTabs({
       </div>
 
       {/* Canvas */}
-      <div className="px-4 py-4">
+
+      <div className="px-4 py-4">'
+                {isFetching ? (
+            <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex justify-end">
+            <div className="rounded-full border border-border/70 bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
+                Updating…
+            </div>
+            </div>
+        ) : null}
         <div
           id="lineage-canvas-panel-overview"
           role="tabpanel"
