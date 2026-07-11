@@ -368,11 +368,28 @@ export default function LineageInspectorPane({
               >
                 {tab === "structure" ? (
                   <div className="space-y-4">
-<ClusterRadialMap
-  radialMap={clusterDetail?.radialMap}
-  articles={clusterDetail?.articles}
-  title="Cluster radial map"
-/>
+<div className="space-y-4">
+  <ClusterRadialMap
+    radialMap={clusterDetail?.radialMap}
+    articles={clusterDetail?.articles}
+    title="Radial map A · subcluster rays"
+    variant="subcluster-rays"
+  />
+
+  <ClusterRadialMap
+    radialMap={clusterDetail?.radialMap}
+    articles={clusterDetail?.articles}
+    title="Radial map B · subcluster segments"
+    variant="subcluster-segments"
+  />
+
+  <ClusterRadialMap
+    radialMap={clusterDetail?.radialMap}
+    articles={clusterDetail?.articles}
+    title="Radial map C · combined"
+    variant="combined"
+  />
+</div>
 
                     <div className="rounded-xl border border-dashed border-border/70 px-4 py-4 text-sm text-muted-foreground">
                       Structure is reserved for cluster-internal geometry only.

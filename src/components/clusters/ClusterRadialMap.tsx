@@ -7,10 +7,16 @@ import type {
   RadialSector,
 } from "@/api/clustering";
 
+type RadialMapVariant =
+  | "subcluster-rays"
+  | "subcluster-segments"
+  | "combined";
+
 type Props = {
   radialMap: ClusterRadialMapData | null | undefined;
   articles?: ArticlePreview[] | null | undefined;
   title?: string;
+  variant?: RadialMapVariant;
 };
 
 const SVG_SIZE = 520;
@@ -126,6 +132,100 @@ function getSubclusterColor(index: number) {
   return palette[Math.abs(index) % palette.length];
 }
 
+function isSegmentVariant(variant: RadialMapVariant) {
+  return variant === "subcluster-segments";
+}
+
+function isCombinedVariant(variant: RadialMapVariant) {
+  return variant === "combined";
+}
+
+function getSectorFillOpacity(variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") return 0.26;
+  if (variant === "combined") return 0.18;
+  return 0.12;
+}
+
+function getSectorStrokeOpacity(variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") return 0.65;
+  if (variant === "combined") return 0.5;
+  return 0.42;
+}
+
+function getSectorStrokeWidth(variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") return 1.5;
+  if (variant === "combined") return 1.15;
+  return 1.1;
+}
+
+function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-rays") {
+    return getSubclusterColor(point.sectorIndex);
+  }
+
+  if (variant === "subcluster-segments") {
+    return point.isCore ? "#2563eb" : "#94a3b8";
+  }
+
+  return getSubclusterColor(point.sectorIndex);
+}
+
+function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    if (point.isCore) return 0.92;
+    if (point.isEdge) return 0.45;
+    if (point.isOutlierRisk) return 0.3;
+    return 0.4;
+  }
+
+  if (variant === "combined") {
+    if (point.isCore) return 0.96;
+    if (point.isEdge) return 0.82;
+    if (point.isOutlierRisk) return 0.7;
+    return 0.76;
+  }
+
+  return getPointOpacity(point);
+}
+
+function getPointStrokeByVariant(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    return point.isCore ? "#ffffff" : "#cbd5e1";
+  }
+
+  if (variant === "combined") {
+    return getPointStroke(point);
+  }
+
+  return getPointStroke(point);
+}
+
+function getPointStrokeWidthByVariant(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    return point.isCore ? 0.9 : 0.5;
+  }
+
+  if (variant === "combined") {
+    return getPointStrokeWidth(point);
+  }
+
+  return getPointStrokeWidth(point);
+}
+
+function getPointRadiusByVariant(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    return point.isCore ? 2.8 : 1.9;
+  }
+
+  if (variant === "combined") {
+    if (point.isOutlier || point.isQuestionable) return 4.2;
+    if (point.isOutlierRisk) return 3.8;
+    return 3;
+  }
+
+  return getPointRadius(point);
+}
+
 function getPointColor(point: RadialPoint) {
   if (point.isOutlier) return "#dc2626";
   if (point.isQuestionable) return "#ea580c";
@@ -215,6 +315,7 @@ export default function ClusterRadialMap({
   radialMap,
   articles,
   title = "Cluster radial map",
+  variant = "subcluster-rays",
 }: Props) {
   const [hovered, setHovered] = useState<HoverState | null>(null);
 
@@ -389,11 +490,11 @@ export default function ClusterRadialMap({
                 <path
                   key={sector.key}
                   d={path}
-                fill={getSubclusterColor(sector.index)}
-                fillOpacity={0.12}
-                stroke={getSubclusterColor(sector.index)}
-                strokeOpacity={0.42}
-                strokeWidth={1.1}
+                    fill={getSubclusterColor(sector.index)}
+                    fillOpacity={getSectorFillOpacity(variant)}
+                    stroke={getSubclusterColor(sector.index)}
+                    strokeOpacity={getSectorStrokeOpacity(variant)}
+                    strokeWidth={getSectorStrokeWidth(variant)}
                 />
               );
             })}
@@ -425,11 +526,11 @@ export default function ClusterRadialMap({
                 key={`${point.articleId}-${point.articleIndex}`}
                 cx={x}
                 cy={y}
-                r={getPointRadius(point)}
-                fill={getSubclusterColor(point.sectorIndex)}
-                fillOpacity={getPointOpacity(point)}
-                stroke={getPointStroke(point)}
-                strokeWidth={getPointStrokeWidth(point)}
+                r={getPointRadiusByVariant(point, variant)}
+                fill={getPointFill(point, variant)}
+                fillOpacity={getPointFillOpacity(point, variant)}
+                stroke={getPointStrokeByVariant(point, variant)}
+                strokeWidth={getPointStrokeWidthByVariant(point, variant)}
                 className="cursor-pointer transition-opacity hover:opacity-100"
                 onMouseEnter={() => setHovered({ point, x, y })}
                 onMouseMove={() => setHovered({ point, x, y })}

@@ -134,11 +134,28 @@ export default function ClusterArticlesDrawer({
             </div>
           ) : detail ? (
             <div className="space-y-4">
+            <div className="space-y-4">
             <ClusterRadialMap
-            radialMap={detail.radialMap}
-            articles={detail.articles}
-            title="Cluster radial map"
+                radialMap={detail.radialMap}
+                articles={detail.articles}
+                title="Radial map A · subcluster rays"
+                variant="subcluster-rays"
             />
+
+            <ClusterRadialMap
+                radialMap={detail.radialMap}
+                articles={detail.articles}
+                title="Radial map B · subcluster segments"
+                variant="subcluster-segments"
+            />
+
+            <ClusterRadialMap
+                radialMap={detail.radialMap}
+                articles={detail.articles}
+                title="Radial map C · combined"
+                variant="combined"
+            />
+            </div>
 
               <ClusterArticlesList articles={detail.articles ?? []} />
             </div>
