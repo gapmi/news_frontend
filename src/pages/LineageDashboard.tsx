@@ -176,6 +176,7 @@ export default function LineageDashboard() {
       }
     }
 
+
     if (anchorRunId !== null) {
       const anchorIndex = allRunIds.indexOf(anchorRunId);
 
@@ -219,19 +220,21 @@ export default function LineageDashboard() {
     staleTime: 30_000,
   });
 
-    const childClustersQuery = useQuery({
-    queryKey: activePair
+  const childRunIdForList = anchorRunId ?? null;
+
+  const childClustersQuery = useQuery({
+    queryKey: childRunIdForList
       ? clusteringKeys.clusters({
-          runid: activePair.childRunId,
+          runid: childRunIdForList,
           limit: 500,
         })
       : [...clusteringKeys.all, "clusters", "child-run", "disabled"],
     queryFn: () =>
       getClusters({
-        runid: activePair!.childRunId,
+        runid: childRunIdForList!,
         limit: 500,
       }),
-    enabled: !!activePair,
+    enabled: childRunIdForList !== null,
     staleTime: 30_000,
   });
 
@@ -475,7 +478,7 @@ export default function LineageDashboard() {
                 </div>
               </section>
             ) : (
-                            <LineageWorkspaceTabs
+                <LineageWorkspaceTabs
                 mode={canvasMode}
                 onChangeMode={setCanvasMode}
                 sankeyData={sankeyQuery.data ?? null}
@@ -485,7 +488,7 @@ export default function LineageDashboard() {
                 selectedEdgeId={selectedEdgeId}
                 activeEdgeIds={activeEdgeIds}
                 focusedRunId={anchorRunId}
-                childRunId={activePair?.childRunId ?? null}
+                childRunId={childRunIdForList}
                 childClusters={childClustersWithFlags}
                 timelineRunIds={windowRunIds}
                 anchorRunId={anchorRunId}
