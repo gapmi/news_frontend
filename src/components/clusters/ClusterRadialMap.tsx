@@ -179,15 +179,15 @@ export default function ClusterRadialMap({
 }: Props) {
   const [hovered, setHovered] = useState<HoverState | null>(null);
 
-    const articlesById = useMemo(() => {
+  const articlesById = useMemo(() => {
     const map = new Map<number, ArticlePreview>();
     for (const article of articles ?? []) {
-        if (typeof article.id === "number") {
+      if (typeof article.id === "number") {
         map.set(article.id, article);
-        }
+      }
     }
     return map;
-    }, [articles]);
+  }, [articles]);
 
   const prepared = useMemo(() => {
     if (!radialMap) return null;
@@ -267,6 +267,18 @@ export default function ClusterRadialMap({
   const hoveredArticle = hovered
     ? articlesById.get(hovered.point.articleId)
     : null;
+
+  const hoveredTitle =
+    hovered?.point.title ?? hoveredArticle?.title ?? `Article ${hovered?.point.articleId ?? "—"}`;
+
+  const hoveredSource =
+    hovered?.point.source ?? hoveredArticle?.source ?? "Unknown source";
+
+  const hoveredPublished =
+    hovered?.point.published ?? hoveredArticle?.published ?? null;
+
+  const hoveredUrl =
+    hovered?.point.url ?? hoveredArticle?.url ?? null;
 
   return (
     <section className="rounded-xl border bg-background p-4">
@@ -395,13 +407,19 @@ export default function ClusterRadialMap({
               }}
             >
               <div className="line-clamp-3 text-sm font-medium leading-5 text-foreground">
-                {hoveredArticle?.title ?? `Article ${hovered.point.articleId}`}
+                {hoveredTitle}
               </div>
 
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>{hoveredArticle?.source ?? "Unknown source"}</span>
-                <span>{formatPublishedAt(hoveredArticle?.published)}</span>
+                <span>{hoveredSource}</span>
+                <span>{formatPublishedAt(hoveredPublished)}</span>
               </div>
+
+              {hoveredUrl ? (
+                <div className="mt-2 line-clamp-2 text-[11px] text-muted-foreground">
+                  {hoveredUrl}
+                </div>
+              ) : null}
 
               <div className="mt-3 grid gap-1 text-[11px] text-muted-foreground">
                 <div>
@@ -481,16 +499,16 @@ export default function ClusterRadialMap({
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Title</span>
                 <span className="max-w-[220px] truncate text-right">
-                  {hoveredArticle?.title ?? "—"}
+                  {hoveredTitle}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Source</span>
-                <span>{hoveredArticle?.source ?? "—"}</span>
+                <span>{hoveredSource}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Published</span>
-                <span>{formatPublishedAt(hoveredArticle?.published)}</span>
+                <span>{formatPublishedAt(hoveredPublished)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Subcluster</span>
@@ -508,6 +526,14 @@ export default function ClusterRadialMap({
                 <span className="text-muted-foreground">Outlier score</span>
                 <span>{formatNumber(hovered.point.outlierScore, 3)}</span>
               </div>
+              {hoveredUrl ? (
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">URL</span>
+                  <span className="max-w-[220px] break-all text-right text-xs">
+                    {hoveredUrl}
+                  </span>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">

@@ -125,7 +125,7 @@ export interface RadialSector {
   index: number;
   key: string;
   label: string;
-  subclusterId: number | null;
+  subclusterId: number | string | null;
   startAngleDeg: number;
   endAngleDeg: number;
   articleCount: number;
@@ -135,6 +135,10 @@ export interface RadialSector {
 export interface RadialPoint {
   articleId: number;
   articleIndex: number;
+  title?: string | null;
+  source?: string | null;
+  published?: string | null;
+  url?: string | null;
   x: number;
   y: number;
   radius: number;
@@ -143,7 +147,7 @@ export interface RadialPoint {
   ringKey: string;
   sectorIndex: number;
   sectorKey: string;
-  subclusterId: number | null;
+  subclusterId: number | string | null;
   subclusterLabel: string | null;
   distanceToCentroid: number | null;
   distanceQuantile: number | null;
@@ -158,7 +162,6 @@ export interface RadialPoint {
   isOutlier: boolean;
   isQuestionable: boolean;
 }
-
 export interface ClusterRadialMap {
   version: number;
   ringMode: string;

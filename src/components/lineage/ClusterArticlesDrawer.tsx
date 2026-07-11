@@ -134,10 +134,11 @@ export default function ClusterArticlesDrawer({
             </div>
           ) : detail ? (
             <div className="space-y-4">
-              <ClusterRadialMap
-                radialMap={detail.radialMap}
-                title="Cluster radial map"
-              />
+            <ClusterRadialMap
+            radialMap={detail.radialMap}
+            articles={detail.articles}
+            title="Cluster radial map"
+            />
 
               <ClusterArticlesList articles={detail.articles ?? []} />
             </div>
