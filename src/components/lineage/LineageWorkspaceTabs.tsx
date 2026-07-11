@@ -4,12 +4,21 @@ import type {
   GraphResponse,
   LineageEdge,
   SankeyResponse,
+  ClusterDetail,
 } from "@/api/clustering";
 import MultiRunSankey from "@/components/charts/MultiRunSankey";
 import LineageFlow from "@/components/charts/LineageFlow";
 import EulerOverlapDiagram from "@/components/charts/EulerOverlapDiagram";
 
 export type CanvasMode = "overview" | "graph" | "overlap";
+
+interface ChildClusterListItem extends ClusterDetail {
+  isNew: boolean;
+  isLinked: boolean;
+  isMerged: boolean;
+  parentEdges: LineageEdge[];
+}
+
 
 interface Props {
   mode: CanvasMode;
@@ -23,6 +32,9 @@ interface Props {
   selectedEdgeId?: number | null;
   activeEdgeIds?: Set<number>;
   focusedRunId?: number | null;
+
+  childRunId: number | null;
+  childClusters: ChildClusterListItem[];
 
   timelineRunIds: number[];
   anchorRunId: number | null;
@@ -157,6 +169,8 @@ export default function LineageWorkspaceTabs({
   selectedEdgeId = null,
   activeEdgeIds = new Set<number>(),
   focusedRunId = null,
+  childRunId,
+  childClusters,
   timelineRunIds,
   anchorRunId,
   minScore,
@@ -182,6 +196,14 @@ export default function LineageWorkspaceTabs({
   const activePairLabel = selectedEdge
     ? `${selectedEdge.parentRunId}:${selectedEdge.parentClusterId} → ${selectedEdge.childRunId}:${selectedEdge.childClusterId}`
     : "No edge selected";
+
+  const childClusterStats = useMemo(() => {
+    const total = childClusters.length;
+    const newCount = childClusters.filter((cluster) => cluster.isNew).length;
+    const linkedCount = childClusters.filter((cluster) => cluster.isLinked).length;
+
+    return { total, newCount, linkedCount };
+  }, [childClusters]);
 
   const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
 
@@ -248,6 +270,9 @@ export default function LineageWorkspaceTabs({
           <span>Threshold {formatScore(safeAppliedScore)}</span>
           <span>Pair edges {activeEdgeIds.size}</span>
           <span>{activePairLabel}</span>
+          <span>
+            Child clusters {childClusterStats.total} · new {childClusterStats.newCount}
+          </span>
         </div>
 
         {/* Command bar */}

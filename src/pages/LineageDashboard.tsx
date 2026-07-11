@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import {
   clusteringKeys,
   getClusterDetail,
+  getClusters,
   getClusteringRuns,
   getEulerPairDetail,
   getGraphView,
   getLineageEdges,
   getPipelineRuns,
   getSankeyView,
+  type ClusterDetail,
   type LineageEdge,
 } from "@/api/clustering";
 import { getLineageWindow } from "@/utils/lineageWindow";
@@ -217,6 +219,22 @@ export default function LineageDashboard() {
     staleTime: 30_000,
   });
 
+    const childClustersQuery = useQuery({
+    queryKey: activePair
+      ? clusteringKeys.clusters({
+          runid: activePair.childRunId,
+          limit: 500,
+        })
+      : [...clusteringKeys.all, "clusters", "child-run", "disabled"],
+    queryFn: () =>
+      getClusters({
+        runid: activePair!.childRunId,
+        limit: 500,
+      }),
+    enabled: !!activePair,
+    staleTime: 30_000,
+  });
+
   const activeEdgeIds = useMemo(() => {
     return new Set((lineageEdgesQuery.data?.items ?? []).map((edge) => edge.edgeId));
   }, [lineageEdgesQuery.data]);
@@ -229,6 +247,33 @@ export default function LineageDashboard() {
       null
     );
   }, [lineageEdgesQuery.data, selectedEdgeId]);
+
+  interface ChildClusterListItem extends ClusterDetail {
+    isNew: boolean;
+    isLinked: boolean;
+    isMerged: boolean;
+    parentEdges: LineageEdge[];
+  }
+
+  const childClustersWithFlags: ChildClusterListItem[] = useMemo(() => {
+    const clusters = childClustersQuery.data?.items ?? [];
+    const edges = lineageEdgesQuery.data?.items ?? [];
+
+    return clusters.map((cluster) => {
+      const parentEdges = edges.filter(
+        (edge) => edge.childClusterId === cluster.clusterId,
+      );
+
+      return {
+        ...cluster,
+        isNew: cluster.incomingEdgeCount === 0,
+        isLinked: cluster.incomingEdgeCount > 0,
+        isMerged: cluster.incomingEdgeCount > 1,
+        parentEdges,
+      };
+    });
+  }, [childClustersQuery.data, lineageEdgesQuery.data]);
+
 
   const eulerDetailQuery = useQuery({
     queryKey: selectedEdgeId
@@ -282,7 +327,11 @@ export default function LineageDashboard() {
           ? sankeyQuery.error.message
           : graphQuery.error instanceof Error
             ? graphQuery.error.message
-            : null;
+            : lineageEdgesQuery.error instanceof Error
+              ? lineageEdgesQuery.error.message
+              : childClustersQuery.error instanceof Error
+                ? childClustersQuery.error.message
+                : null;
 
   // initial loading — только первый заход
   const isInitialPageLoading =
@@ -295,7 +344,10 @@ export default function LineageDashboard() {
 
   // background refetch — без skeleton, с overlay
   const isStageFetching =
-    sankeyQuery.isFetching || graphQuery.isFetching || lineageEdgesQuery.isFetching;
+    sankeyQuery.isFetching ||
+    graphQuery.isFetching ||
+    lineageEdgesQuery.isFetching ||
+    childClustersQuery.isFetching;
 
   const hasNoRuns =
     !runsQuery.isLoading &&
@@ -423,7 +475,7 @@ export default function LineageDashboard() {
                 </div>
               </section>
             ) : (
-              <LineageWorkspaceTabs
+                            <LineageWorkspaceTabs
                 mode={canvasMode}
                 onChangeMode={setCanvasMode}
                 sankeyData={sankeyQuery.data ?? null}
@@ -433,6 +485,8 @@ export default function LineageDashboard() {
                 selectedEdgeId={selectedEdgeId}
                 activeEdgeIds={activeEdgeIds}
                 focusedRunId={anchorRunId}
+                childRunId={activePair?.childRunId ?? null}
+                childClusters={childClustersWithFlags}
                 timelineRunIds={windowRunIds}
                 anchorRunId={anchorRunId}
                 minScore={draftMinScore}
