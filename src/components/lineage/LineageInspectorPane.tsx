@@ -369,8 +369,8 @@ export default function LineageInspectorPane({
                 {tab === "structure" ? (
                   <div className="space-y-4">
 <ClusterRadialMap
-  radialMap={detail.radialMap}
-  articles={detail.articles}
+  radialMap={clusterDetail?.radialMap}
+  articles={clusterDetail?.articles}
   title="Cluster radial map"
 />
 
