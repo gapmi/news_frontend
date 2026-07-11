@@ -197,15 +197,15 @@ export default function LineageWorkspaceTabs({
     ? `${selectedEdge.parentRunId}:${selectedEdge.parentClusterId} → ${selectedEdge.childRunId}:${selectedEdge.childClusterId}`
     : "No edge selected";
 
-  const childClusterStats = useMemo(() => {
+  const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
+
+    const childClusterStats = useMemo(() => {
     const total = childClusters.length;
     const newCount = childClusters.filter((cluster) => cluster.isNew).length;
     const linkedCount = childClusters.filter((cluster) => cluster.isLinked).length;
 
     return { total, newCount, linkedCount };
   }, [childClusters]);
-
-  const thresholdPresets = useMemo(() => [0.2, 0.35, 0.42, 0.55, 0.7], []);
 
   useEffect(() => {
     if (!activeRunButtonRef.current) return;
@@ -271,7 +271,7 @@ export default function LineageWorkspaceTabs({
           <span>Pair edges {activeEdgeIds.size}</span>
           <span>{activePairLabel}</span>
           <span>
-            Child clusters {childClusterStats.total} · new {childClusterStats.newCount}
+            Child clusters {childClusterStats.total} · new {childClusterStats.newCount} · linked {childClusterStats.linkedCount}
           </span>
         </div>
 
