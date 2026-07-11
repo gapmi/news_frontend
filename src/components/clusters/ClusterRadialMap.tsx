@@ -108,6 +108,24 @@ function getSectorFill(index: number) {
   return palette[index % palette.length];
 }
 
+function getSubclusterColor(index: number) {
+  const palette = [
+    "#2563eb",
+    "#7c3aed",
+    "#db2777",
+    "#ea580c",
+    "#16a34a",
+    "#0891b2",
+    "#ca8a04",
+    "#dc2626",
+    "#4f46e5",
+    "#059669",
+    "#9333ea",
+    "#0f766e",
+  ];
+  return palette[Math.abs(index) % palette.length];
+}
+
 function getPointColor(point: RadialPoint) {
   if (point.isOutlier) return "#dc2626";
   if (point.isQuestionable) return "#ea580c";
@@ -122,6 +140,27 @@ function getPointRadius(point: RadialPoint) {
   if (point.isQuestionable) return 4;
   if (point.isOutlierRisk) return 4;
   return 3.2;
+}
+
+function getPointOpacity(point: RadialPoint) {
+  if (point.isOutlier) return 0.98;
+  if (point.isQuestionable) return 0.92;
+  if (point.isOutlierRisk) return 0.88;
+  if (point.isEdge) return 0.84;
+  if (point.isCore) return 0.92;
+  return 0.8;
+}
+
+function getPointStroke(point: RadialPoint) {
+  if (point.isOutlier) return "#7f1d1d";
+  if (point.isQuestionable) return "#9a3412";
+  if (point.isOutlierRisk) return "#92400e";
+  return "#ffffff";
+}
+
+function getPointStrokeWidth(point: RadialPoint) {
+  if (point.isOutlier || point.isQuestionable || point.isOutlierRisk) return 1;
+  return 0.6;
 }
 
 function normalizeRings(rings: RadialRing[]) {
@@ -350,11 +389,11 @@ export default function ClusterRadialMap({
                 <path
                   key={sector.key}
                   d={path}
-                  fill={getSectorFill(sector.index)}
-                  fillOpacity={0.18}
-                  stroke="#cbd5e1"
-                  strokeOpacity={0.35}
-                  strokeWidth={0.8}
+                fill={getSubclusterColor(sector.index)}
+                fillOpacity={0.12}
+                stroke={getSubclusterColor(sector.index)}
+                strokeOpacity={0.42}
+                strokeWidth={1.1}
                 />
               );
             })}
@@ -387,10 +426,10 @@ export default function ClusterRadialMap({
                 cx={x}
                 cy={y}
                 r={getPointRadius(point)}
-                fill={getPointColor(point)}
-                fillOpacity={0.9}
-                stroke="#ffffff"
-                strokeWidth={0.8}
+                fill={getSubclusterColor(point.sectorIndex)}
+                fillOpacity={getPointOpacity(point)}
+                stroke={getPointStroke(point)}
+                strokeWidth={getPointStrokeWidth(point)}
                 className="cursor-pointer transition-opacity hover:opacity-100"
                 onMouseEnter={() => setHovered({ point, x, y })}
                 onMouseMove={() => setHovered({ point, x, y })}
