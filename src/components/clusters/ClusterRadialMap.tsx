@@ -103,13 +103,13 @@ function describeArc(
 function getSubclusterColor(index: number) {
   const palette = [
     "#2563eb",
+    "#dc2626",
     "#7c3aed",
     "#db2777",
     "#ea580c",
     "#16a34a",
     "#0891b2",
     "#ca8a04",
-    "#dc2626",
     "#4f46e5",
     "#059669",
     "#9333ea",
