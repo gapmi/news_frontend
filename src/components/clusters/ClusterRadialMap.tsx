@@ -100,20 +100,6 @@ function describeArc(
   ].join(" ");
 }
 
-function getSectorFill(index: number) {
-  const palette = [
-    "#dbeafe",
-    "#ede9fe",
-    "#dcfce7",
-    "#fef3c7",
-    "#fee2e2",
-    "#e0f2fe",
-    "#fce7f3",
-    "#ecfccb",
-  ];
-  return palette[index % palette.length];
-}
-
 function getSubclusterColor(index: number) {
   const palette = [
     "#2563eb",
@@ -132,13 +118,6 @@ function getSubclusterColor(index: number) {
   return palette[Math.abs(index) % palette.length];
 }
 
-function isSegmentVariant(variant: RadialMapVariant) {
-  return variant === "subcluster-segments";
-}
-
-function isCombinedVariant(variant: RadialMapVariant) {
-  return variant === "combined";
-}
 
 function getSectorFillOpacity(variant: RadialMapVariant) {
   if (variant === "subcluster-segments") return 0.26;
@@ -226,14 +205,6 @@ function getPointRadiusByVariant(point: RadialPoint, variant: RadialMapVariant) 
   return getPointRadius(point);
 }
 
-function getPointColor(point: RadialPoint) {
-  if (point.isOutlier) return "#dc2626";
-  if (point.isQuestionable) return "#ea580c";
-  if (point.isOutlierRisk) return "#d97706";
-  if (point.isEdge) return "#7c3aed";
-  if (point.isCore) return "#2563eb";
-  return "#64748b";
-}
 
 function getPointRadius(point: RadialPoint) {
   if (point.isOutlier) return 4.5;
@@ -626,60 +597,6 @@ export default function ClusterRadialMap({
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="rounded-xl border bg-card/40 p-3">
-          <div className="text-sm font-medium">Hovered point</div>
-          {hovered ? (
-            <div className="mt-3 grid gap-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Article</span>
-                <span>{hovered.point.articleId}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Title</span>
-                <span className="max-w-[220px] truncate text-right">
-                  {hoveredTitle}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Source</span>
-                <span>{hoveredSource}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Published</span>
-                <span>{formatPublishedAt(hoveredPublished)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Subcluster</span>
-                <span>{hovered.point.subclusterLabel ?? "—"}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Confidence</span>
-                <span>{formatNumber(hovered.point.membershipConfidence, 3)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Distance</span>
-                <span>{formatNumber(hovered.point.distanceToCentroid, 3)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Outlier score</span>
-                <span>{formatNumber(hovered.point.outlierScore, 3)}</span>
-              </div>
-              {hoveredUrl ? (
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">URL</span>
-                  <span className="max-w-[220px] break-all text-right text-xs">
-                    {hoveredUrl}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Hover a point to inspect article metadata and membership metrics.
-            </p>
-          )}
         </div>
       </div>
     </section>
