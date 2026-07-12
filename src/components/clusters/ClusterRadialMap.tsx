@@ -379,7 +379,10 @@ export default function ClusterRadialMap({
     ? articlesById.get(hovered.point.articleId)
     : null;
 
-  const hoveredTitle =
+  const hoveredArticleId =
+    hovered?.point.articleId ?? "—";
+
+    const hoveredTitle =
     hovered?.point.title ?? hoveredArticle?.title ?? `Article ${hovered?.point.articleId ?? "—"}`;
 
   const hoveredSource =
@@ -517,6 +520,10 @@ export default function ClusterRadialMap({
                 top: `min(calc(${(hovered.y / SVG_SIZE) * 100}% + 16px), calc(100% - 132px))`,
               }}
             >
+              <div className="line-clamp-3 text-sm font-medium leading-5 text-foreground">
+                {hoveredArticleId}
+              </div>
+              
               <div className="line-clamp-3 text-sm font-medium leading-5 text-foreground">
                 {hoveredTitle}
               </div>
