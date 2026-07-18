@@ -7,10 +7,12 @@ import type {
   RadialSector,
 } from "@/api/clustering";
 
+
 type RadialMapVariant =
   | "subcluster-rays"
   | "subcluster-segments"
   | "combined";
+
 
 type Props = {
   radialMap: ClusterRadialMapData | null | undefined;
@@ -19,18 +21,22 @@ type Props = {
   variant?: RadialMapVariant;
 };
 
+
 const SVG_SIZE = 520;
 const CENTER = SVG_SIZE / 2;
 const OUTER_RADIUS = 210;
+
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
 
+
 function safeNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
+
 
 function formatNumber(value: number | null | undefined, digits = 2) {
   return typeof value === "number" && Number.isFinite(value)
@@ -38,10 +44,12 @@ function formatNumber(value: number | null | undefined, digits = 2) {
     : "—";
 }
 
+
 function formatPublishedAt(value: string | null | undefined) {
   if (!value) return "Unknown date";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
+
 
   return new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
@@ -52,16 +60,22 @@ function formatPublishedAt(value: string | null | undefined) {
   }).format(date);
 }
 
+
+// Single canonical angle convention for the whole component:
+// 0deg = top (12 o'clock), positive = clockwise. Sectors AND points
+// must both go through this function — never use raw point.x/point.y.
 function polarToCartesian(radius: number, angleDeg: number) {
   const safeRadius = safeNumber(radius, 0);
   const safeAngle = safeNumber(angleDeg, 0);
   const angle = ((safeAngle - 90) * Math.PI) / 180;
+
 
   return {
     x: CENTER + safeRadius * Math.cos(angle),
     y: CENTER + safeRadius * Math.sin(angle),
   };
 }
+
 
 function describeArc(
   innerRadius: number,
@@ -74,13 +88,16 @@ function describeArc(
   const safeStart = safeNumber(startAngleDeg, 0);
   const safeEnd = safeNumber(endAngleDeg, 0);
 
+
   const startOuter = polarToCartesian(safeOuter, safeEnd);
   const endOuter = polarToCartesian(safeOuter, safeStart);
   const startInner = polarToCartesian(safeInner, safeStart);
   const endInner = polarToCartesian(safeInner, safeEnd);
 
+
   const delta = ((safeEnd - safeStart) % 360 + 360) % 360;
   const largeArcFlag = delta > 180 ? 1 : 0;
+
 
   if (safeInner <= 0) {
     return [
@@ -91,6 +108,7 @@ function describeArc(
     ].join(" ");
   }
 
+
   return [
     `M ${startOuter.x} ${startOuter.y}`,
     `A ${safeOuter} ${safeOuter} 0 ${largeArcFlag} 0 ${endOuter.x} ${endOuter.y}`,
@@ -99,6 +117,7 @@ function describeArc(
     "Z",
   ].join(" ");
 }
+
 
 function getSubclusterColor(index: number) {
   const palette = [
@@ -119,11 +138,13 @@ function getSubclusterColor(index: number) {
 }
 
 
+
 function getSectorFillOpacity(variant: RadialMapVariant) {
   if (variant === "subcluster-segments") return 0.26;
   if (variant === "combined") return 0.18;
   return 0.12;
 }
+
 
 function getSectorStrokeOpacity(variant: RadialMapVariant) {
   if (variant === "subcluster-segments") return 0.65;
@@ -131,23 +152,28 @@ function getSectorStrokeOpacity(variant: RadialMapVariant) {
   return 0.42;
 }
 
+
 function getSectorStrokeWidth(variant: RadialMapVariant) {
   if (variant === "subcluster-segments") return 1.5;
   if (variant === "combined") return 1.15;
   return 1.1;
 }
 
+
 function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-rays") {
     return getSubclusterColor(point.sectorIndex);
   }
 
+
   if (variant === "subcluster-segments") {
     return point.isCore ? "#2563eb" : "#94a3b8";
   }
 
+
   return getSubclusterColor(point.sectorIndex);
 }
+
 
 function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-segments") {
@@ -157,6 +183,7 @@ function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
     return 0.4;
   }
 
+
   if (variant === "combined") {
     if (point.isCore) return 0.96;
     if (point.isEdge) return 0.82;
@@ -164,37 +191,46 @@ function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
     return 0.76;
   }
 
+
   return getPointOpacity(point);
 }
+
 
 function getPointStrokeByVariant(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-segments") {
     return point.isCore ? "#ffffff" : "#cbd5e1";
   }
 
+
   if (variant === "combined") {
     return getPointStroke(point);
   }
 
+
   return getPointStroke(point);
 }
+
 
 function getPointStrokeWidthByVariant(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-segments") {
     return point.isCore ? 0.9 : 0.5;
   }
 
+
   if (variant === "combined") {
     return getPointStrokeWidth(point);
   }
 
+
   return getPointStrokeWidth(point);
 }
+
 
 function getPointRadiusByVariant(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-segments") {
     return point.isCore ? 2.8 : 1.9;
   }
+
 
   if (variant === "combined") {
     if (point.isOutlier || point.isQuestionable) return 4.2;
@@ -202,8 +238,10 @@ function getPointRadiusByVariant(point: RadialPoint, variant: RadialMapVariant) 
     return 3;
   }
 
+
   return getPointRadius(point);
 }
+
 
 
 function getPointRadius(point: RadialPoint) {
@@ -212,6 +250,7 @@ function getPointRadius(point: RadialPoint) {
   if (point.isOutlierRisk) return 4;
   return 3.2;
 }
+
 
 function getPointOpacity(point: RadialPoint) {
   if (point.isOutlier) return 0.98;
@@ -222,6 +261,7 @@ function getPointOpacity(point: RadialPoint) {
   return 0.8;
 }
 
+
 function getPointStroke(point: RadialPoint) {
   if (point.isOutlier) return "#7f1d1d";
   if (point.isQuestionable) return "#9a3412";
@@ -229,13 +269,16 @@ function getPointStroke(point: RadialPoint) {
   return "#ffffff";
 }
 
+
 function getPointStrokeWidth(point: RadialPoint) {
   if (point.isOutlier || point.isQuestionable || point.isOutlierRisk) return 1;
   return 0.6;
 }
 
+
 function normalizeRings(rings: RadialRing[]) {
   if (!rings.length) return [];
+
 
   const validRings = rings
     .map((ring) => ({
@@ -245,9 +288,12 @@ function normalizeRings(rings: RadialRing[]) {
     }))
     .filter((ring) => ring.radiusOuter >= 0 && ring.radiusOuter >= ring.radiusInner);
 
+
   if (!validRings.length) return [];
 
+
   const maxOuter = Math.max(1, ...validRings.map((ring) => ring.radiusOuter));
+
 
   return validRings.map((ring) => ({
     ...ring,
@@ -256,31 +302,30 @@ function normalizeRings(rings: RadialRing[]) {
   }));
 }
 
-function resolvePointPosition(
-  point: RadialPoint,
-  maxPointRadius: number,
-  useCartesian: boolean,
-) {
-  if (useCartesian) {
-    return {
-      x: CENTER + safeNumber(point.x, 0) * OUTER_RADIUS,
-      y: CENTER + safeNumber(point.y, 0) * OUTER_RADIUS,
-    };
-  }
 
+// Always derive position from radius + angleDeg — the same convention
+// used by the sector arcs (polarToCartesian). Raw point.x/point.y from
+// the API are never used: they're computed backend-side with a plain
+// math angle convention that does not match the -90/clockwise SVG
+// convention used here, which is exactly what caused points to render
+// inside the wrong sector.
+function resolvePointPosition(point: RadialPoint, maxPointRadius: number) {
   const normalizedRadius =
     maxPointRadius > 0
       ? clamp((safeNumber(point.radius, 0) / maxPointRadius) * OUTER_RADIUS, 0, OUTER_RADIUS)
       : 0;
 
+
   return polarToCartesian(normalizedRadius, safeNumber(point.angleDeg, 0));
 }
+
 
 type HoverState = {
   point: RadialPoint;
   x: number;
   y: number;
 };
+
 
 export default function ClusterRadialMap({
   radialMap,
@@ -289,6 +334,7 @@ export default function ClusterRadialMap({
   variant = "subcluster-rays",
 }: Props) {
   const [hovered, setHovered] = useState<HoverState | null>(null);
+
 
   const articlesById = useMemo(() => {
     const map = new Map<number, ArticlePreview>();
@@ -300,8 +346,10 @@ export default function ClusterRadialMap({
     return map;
   }, [articles]);
 
+
   const prepared = useMemo(() => {
     if (!radialMap) return null;
+
 
     const rings = normalizeRings(radialMap.rings ?? []);
     const sectors = (radialMap.sectors ?? []).filter(
@@ -310,32 +358,24 @@ export default function ClusterRadialMap({
         Number.isFinite(sector.endAngleDeg),
     );
 
-    const rawPoints = (radialMap.points ?? []).filter((point) => {
-      const hasCartesian =
-        Number.isFinite(point.x) && Number.isFinite(point.y);
-      const hasPolar =
-        Number.isFinite(point.radius) && Number.isFinite(point.angleDeg);
-      return hasCartesian || hasPolar;
-    });
+
+    // Points must have valid polar data (radius + angleDeg) to be
+    // rendered — that's the only geometry we trust now.
+    const rawPoints = (radialMap.points ?? []).filter(
+      (point) =>
+        Number.isFinite(point.radius) && Number.isFinite(point.angleDeg),
+    );
+
 
     const maxPointRadius = Math.max(
       1,
       ...rawPoints.map((point) => safeNumber(point.radius, 0)),
     );
 
-    const cartesianLooksValid =
-      rawPoints.length > 0 &&
-      rawPoints.every(
-        (point) =>
-          Number.isFinite(point.x) &&
-          Number.isFinite(point.y) &&
-          Math.abs(safeNumber(point.x, 0)) <= 1.25 &&
-          Math.abs(safeNumber(point.y, 0)) <= 1.25,
-      );
 
     const points = rawPoints
       .map((point) => {
-        const pos = resolvePointPosition(point, maxPointRadius, cartesianLooksValid);
+        const pos = resolvePointPosition(point, maxPointRadius);
         return {
           point,
           x: pos.x,
@@ -352,12 +392,14 @@ export default function ClusterRadialMap({
           item.y <= SVG_SIZE + 40,
       );
 
+
     return {
       rings,
       sectors,
       points,
     };
   }, [radialMap]);
+
 
   if (!radialMap) {
     return (
@@ -367,6 +409,7 @@ export default function ClusterRadialMap({
     );
   }
 
+
   if (!prepared) {
     return (
       <div className="rounded-xl border border-dashed bg-background px-4 py-6 text-sm text-muted-foreground">
@@ -375,24 +418,31 @@ export default function ClusterRadialMap({
     );
   }
 
+
   const hoveredArticle = hovered
     ? articlesById.get(hovered.point.articleId)
     : null;
 
+
   const hoveredArticleId =
     hovered?.point.articleId ?? "—";
+
 
     const hoveredTitle =
     hovered?.point.title ?? hoveredArticle?.title ?? `Article ${hovered?.point.articleId ?? "—"}`;
 
+
   const hoveredSource =
     hovered?.point.source ?? hoveredArticle?.source ?? "Unknown source";
+
 
   const hoveredPublished =
     hovered?.point.published ?? hoveredArticle?.published ?? null;
 
+
   const hoveredUrl =
     hovered?.point.url ?? hoveredArticle?.url ?? null;
+
 
   return (
     <section className="rounded-xl border bg-background p-4">
@@ -404,6 +454,7 @@ export default function ClusterRadialMap({
             {radialMap.sectorMode ?? "—"} · version {radialMap.version ?? "—"}
           </p>
         </div>
+
 
         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
           <div className="rounded-md border bg-card px-3 py-2">
@@ -433,10 +484,12 @@ export default function ClusterRadialMap({
         </div>
       </div>
 
+
       <div className="mb-3 rounded-lg border border-dashed bg-card/40 px-3 py-2 text-xs text-muted-foreground">
         Rendered: {prepared.rings.length} rings · {prepared.sectors.length} sectors ·{" "}
         {prepared.points.length} visible points
       </div>
+
 
       <div className="space-y-4">
         <div className="relative rounded-xl border bg-card/40 p-3">
@@ -449,9 +502,11 @@ export default function ClusterRadialMap({
           >
             <rect x={0} y={0} width={SVG_SIZE} height={SVG_SIZE} fill="transparent" />
 
+
             {prepared.sectors.map((sector: RadialSector) => {
               const outerRing = prepared.rings[prepared.rings.length - 1];
               if (!outerRing) return null;
+
 
               const path = describeArc(
                 0,
@@ -459,6 +514,7 @@ export default function ClusterRadialMap({
                 safeNumber(sector.startAngleDeg, 0),
                 safeNumber(sector.endAngleDeg, 0),
               );
+
 
               return (
                 <path
@@ -473,11 +529,14 @@ export default function ClusterRadialMap({
               );
             })}
 
+
             {prepared.rings.map((ring) => {
               const radius = (ring.inner + ring.outer) / 2;
               const width = Math.max(1, ring.outer - ring.inner);
 
+
               if (!Number.isFinite(radius) || radius <= 0) return null;
+
 
               return (
                 <circle
@@ -493,7 +552,9 @@ export default function ClusterRadialMap({
               );
             })}
 
+
             <circle cx={CENTER} cy={CENTER} r={2.5} fill="#0f172a" />
+
 
             {prepared.points.map(({ point, x, y }) => (
               <circle
@@ -512,6 +573,7 @@ export default function ClusterRadialMap({
             ))}
           </svg>
 
+
           {hovered ? (
             <div
               className="pointer-events-none absolute z-20 max-w-[320px] rounded-lg border border-border/80 bg-background/95 px-3 py-3 shadow-lg backdrop-blur"
@@ -528,16 +590,19 @@ export default function ClusterRadialMap({
                 {hoveredTitle}
               </div>
 
+
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>{hoveredSource}</span>
                 <span>{formatPublishedAt(hoveredPublished)}</span>
               </div>
+
 
               {hoveredUrl ? (
                 <div className="mt-2 line-clamp-2 text-[11px] text-muted-foreground">
                   {hoveredUrl}
                 </div>
               ) : null}
+
 
               <div className="mt-3 grid gap-1 text-[11px] text-muted-foreground">
                 <div>
@@ -551,6 +616,7 @@ export default function ClusterRadialMap({
             </div>
           ) : null}
         </div>
+
 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border bg-card/40 p-3">
@@ -578,6 +644,7 @@ export default function ClusterRadialMap({
               </div>
             </div>
           </div>
+
 
           <div className="rounded-xl border bg-card/40 p-3">
             <div className="text-sm font-medium">Distribution</div>
