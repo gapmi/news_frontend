@@ -61,9 +61,6 @@ function formatPublishedAt(value: string | null | undefined) {
 }
 
 
-// Single canonical angle convention for the whole component:
-// 0deg = top (12 o'clock), positive = clockwise. Sectors AND points
-// must both go through this function — never use raw point.x/point.y.
 function polarToCartesian(radius: number, angleDeg: number) {
   const safeRadius = safeNumber(radius, 0);
   const safeAngle = safeNumber(angleDeg, 0);
@@ -137,137 +134,12 @@ function getSubclusterColor(index: number) {
   return palette[Math.abs(index) % palette.length];
 }
 
-function getRingColor(ring: RadialRing) {
-  switch (ring.key) {
-    case "core":
-      return "#ff0000"; // blue
-    case "mid":
-      return "#fffb00"; // green
-    case "edge":
-      return "#3bfd00"; // violet
-    case "outlier_risk":
-      return "#00ffee"; // amber
-    default:
-      return "#616161"; // slate fallback
-  }
-}
-
-function getRingStrokeOpacity(ring: RadialRing, variant: RadialMapVariant) {
-  if (variant === "subcluster-segments") {
-    switch (ring.key) {
-      case "core":
-        return 0.28;
-      case "mid":
-        return 0.24;
-      case "edge":
-        return 0.22;
-      case "outlier_risk":
-        return 0.26;
-      default:
-        return 0.2;
-    }
-  }
-
-  if (variant === "combined") {
-    switch (ring.key) {
-      case "core":
-        return 0.34;
-      case "mid":
-        return 0.28;
-      case "edge":
-        return 0.26;
-      case "outlier_risk":
-        return 0.3;
-      default:
-        return 0.24;
-    }
-  }
-
-  switch (ring.key) {
-    case "core":
-      return 0.36;
-    case "mid":
-      return 0.3;
-    case "edge":
-      return 0.28;
-    case "outlier_risk":
-      return 0.34;
-    default:
-      return 0.26;
-  }
-}
-
-function getRingFillOpacity(ring: RadialRing, variant: RadialMapVariant) {
-  if (variant === "subcluster-segments") {
-    switch (ring.key) {
-      case "core":
-        return 0.05;
-      case "mid":
-        return 0.04;
-      case "edge":
-        return 0.035;
-      case "outlier_risk":
-        return 0.05;
-      default:
-        return 0.03;
-    }
-  }
-
-  if (variant === "combined") {
-    switch (ring.key) {
-      case "core":
-        return 0.07;
-      case "mid":
-        return 0.05;
-      case "edge":
-        return 0.045;
-      case "outlier_risk":
-        return 0.06;
-      default:
-        return 0.04;
-    }
-  }
-
-  switch (ring.key) {
-    case "core":
-      return 0.08;
-    case "mid":
-      return 0.06;
-    case "edge":
-      return 0.05;
-    case "outlier_risk":
-      return 0.07;
-    default:
-      return 0.04;
-  }
-}
-
-
 
 function getPointStroke(point: RadialPoint) {
   if (point.isOutlier) return "#7f1d1d";
   if (point.isQuestionable) return "#9a3412";
   if (point.isOutlierRisk) return "#92400e";
   return "#ffffff";
-}
-
-function getRingDotRadius(ring: RadialRing) {
-  switch (ring.key) {
-    case "core":
-      return 2.2;
-    case "mid":
-      return 2.5;
-    case "edge":
-      return 2.6;
-    case "outlier_risk":
-      return 2.8;
-    default:
-      return 2.4;
-  }
-}
-
-function getRingDotCount(radius: number) {
-  return Math.max(24, Math.floor((2 * Math.PI * radius) / 12));
 }
 
 
@@ -477,8 +349,6 @@ export default function ClusterRadialMap({
     );
 
 
-    // Points must have valid polar data (radius + angleDeg) to be
-    // rendered — that's the only geometry we trust now.
     const rawPoints = (radialMap.points ?? []).filter(
       (point) =>
         Number.isFinite(point.radius) && Number.isFinite(point.angleDeg),
@@ -645,36 +515,24 @@ export default function ClusterRadialMap({
   );
 })}
 
+{prepared.rings.map((ring) => {
+  const radius = (ring.inner + ring.outer) / 2;
 
-            {prepared.rings.map((ring) => {
-            const radius = (ring.inner + ring.outer) / 2;
+  if (!Number.isFinite(radius) || radius <= 0) return null;
 
-            if (!Number.isFinite(radius) || radius <= 0) return null;
-
-            const dotCount = getRingDotCount(radius);
-            const dotRadius = getRingDotRadius(ring);
-            const color = getRingColor(ring);
-
-            return (
-                <g key={ring.key}>
-                {Array.from({ length: dotCount }).map((_, i) => {
-                    const angleDeg = (360 * i) / dotCount;
-                    const { x, y } = polarToCartesian(radius, angleDeg);
-
-                    return (
-                    <circle
-                        key={`${ring.key}-${i}`}
-                        cx={x}
-                        cy={y}
-                        r={dotRadius}
-                        fill={color}
-                        fillOpacity={0.95}
-                    />
-                    );
-                })}
-                </g>
-            );
-            })}
+  return (
+    <circle
+      key={ring.key}
+      cx={CENTER}
+      cy={CENTER}
+      r={radius}
+      fill="none"
+      stroke="#94a3b8"
+      strokeOpacity={0.42}
+      strokeWidth={1}
+    />
+  );
+})}
 
 
             <circle cx={CENTER} cy={CENTER} r={2.5} fill="#0f172a" />
