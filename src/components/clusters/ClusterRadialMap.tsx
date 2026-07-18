@@ -251,6 +251,25 @@ function getPointStroke(point: RadialPoint) {
   return "#ffffff";
 }
 
+function getRingDotRadius(ring: RadialRing) {
+  switch (ring.key) {
+    case "core":
+      return 2.2;
+    case "mid":
+      return 2.5;
+    case "edge":
+      return 2.6;
+    case "outlier_risk":
+      return 2.8;
+    default:
+      return 2.4;
+  }
+}
+
+function getRingDotCount(radius: number) {
+  return Math.max(24, Math.floor((2 * Math.PI * radius) / 12));
+}
+
 
 function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-rays") {
@@ -637,23 +656,31 @@ export default function ClusterRadialMap({
 
             {prepared.rings.map((ring) => {
             const radius = (ring.inner + ring.outer) / 2;
-            const width = Math.max(1, ring.outer - ring.inner);
-            const ringColor = getRingColor(ring);
 
             if (!Number.isFinite(radius) || radius <= 0) return null;
 
+            const dotCount = getRingDotCount(radius);
+            const dotRadius = getRingDotRadius(ring);
+            const color = getRingColor(ring);
+
             return (
-                <circle
-                key={ring.key}
-                cx={CENTER}
-                cy={CENTER}
-                r={radius}
-                fill="none"
-                stroke={ringColor}
-                strokeWidth={Math.max(2, width * 0.22)}
-                strokeOpacity={0.9}
-                strokeDasharray="6 6"
-                />
+                <g key={ring.key}>
+                {Array.from({ length: dotCount }).map((_, i) => {
+                    const angleDeg = (360 * i) / dotCount;
+                    const { x, y } = polarToCartesian(radius, angleDeg);
+
+                    return (
+                    <circle
+                        key={`${ring.key}-${i}`}
+                        cx={x}
+                        cy={y}
+                        r={dotRadius}
+                        fill={color}
+                        fillOpacity={0.95}
+                    />
+                    );
+                })}
+                </g>
             );
             })}
 
