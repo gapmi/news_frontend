@@ -152,6 +152,97 @@ function getRingColor(ring: RadialRing) {
   }
 }
 
+function getRingStrokeOpacity(ring: RadialRing, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    switch (ring.key) {
+      case "core":
+        return 0.28;
+      case "mid":
+        return 0.24;
+      case "edge":
+        return 0.22;
+      case "outlier_risk":
+        return 0.26;
+      default:
+        return 0.2;
+    }
+  }
+
+  if (variant === "combined") {
+    switch (ring.key) {
+      case "core":
+        return 0.34;
+      case "mid":
+        return 0.28;
+      case "edge":
+        return 0.26;
+      case "outlier_risk":
+        return 0.3;
+      default:
+        return 0.24;
+    }
+  }
+
+  switch (ring.key) {
+    case "core":
+      return 0.36;
+    case "mid":
+      return 0.3;
+    case "edge":
+      return 0.28;
+    case "outlier_risk":
+      return 0.34;
+    default:
+      return 0.26;
+  }
+}
+
+function getRingFillOpacity(ring: RadialRing, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    switch (ring.key) {
+      case "core":
+        return 0.05;
+      case "mid":
+        return 0.04;
+      case "edge":
+        return 0.035;
+      case "outlier_risk":
+        return 0.05;
+      default:
+        return 0.03;
+    }
+  }
+
+  if (variant === "combined") {
+    switch (ring.key) {
+      case "core":
+        return 0.07;
+      case "mid":
+        return 0.05;
+      case "edge":
+        return 0.045;
+      case "outlier_risk":
+        return 0.06;
+      default:
+        return 0.04;
+    }
+  }
+
+  switch (ring.key) {
+    case "core":
+      return 0.08;
+    case "mid":
+      return 0.06;
+    case "edge":
+      return 0.05;
+    case "outlier_risk":
+      return 0.07;
+    default:
+      return 0.04;
+  }
+}
+
+
 
 function getPointStroke(point: RadialPoint) {
   if (point.isOutlier) return "#7f1d1d";
@@ -173,17 +264,6 @@ function getRingDotRadius(ring: RadialRing) {
     default:
       return 2.4;
   }
-}
-
-function getRadialGuideEnd(angleDeg: number, radius: number) {
-  return polarToCartesian(radius, angleDeg);
-}
-
-function getSectorMidAngle(sector: RadialSector) {
-  const start = safeNumber(sector.startAngleDeg, 0);
-  const end = safeNumber(sector.endAngleDeg, 0);
-  const delta = ((end - start) % 360 + 360) % 360;
-  return (start + delta / 2) % 360;
 }
 
 function getRingDotCount(radius: number) {
@@ -347,12 +427,6 @@ function normalizeRings(rings: RadialRing[]) {
 }
 
 
-// Always derive position from radius + angleDeg — the same convention
-// used by the sector arcs (polarToCartesian). Raw point.x/point.y from
-// the API are never used: they're computed backend-side with a plain
-// math angle convention that does not match the -90/clockwise SVG
-// convention used here, which is exactly what caused points to render
-// inside the wrong sector.
 function resolvePointPosition(point: RadialPoint, maxPointRadius: number) {
   const normalizedRadius =
     maxPointRadius > 0
@@ -547,44 +621,29 @@ export default function ClusterRadialMap({
             <rect x={0} y={0} width={SVG_SIZE} height={SVG_SIZE} fill="transparent" />
 
 
-            {prepared.sectors.map((sector: RadialSector) => {
-            const angleDeg = getSectorMidAngle(sector);
-            const end = getRadialGuideEnd(angleDeg, OUTER_RADIUS);
+{prepared.sectors.map((sector: RadialSector) => {
+  const outerRing = prepared.rings[prepared.rings.length - 1];
+  if (!outerRing) return null;
 
-            return (
-                <line
-                key={`guide-${sector.key}`}
-                x1={CENTER}
-                y1={CENTER}
-                x2={end.x}
-                y2={end.y}
-                stroke="#9ca3af"
-                strokeOpacity={0.55}
-                strokeWidth={1.2}
-                strokeLinecap="round"
-                />
-            );
-            })}
+  const path = describeArc(
+    0,
+    outerRing.outer,
+    safeNumber(sector.startAngleDeg, 0),
+    safeNumber(sector.endAngleDeg, 0),
+  );
 
-           {/* //Если делать не центральную ось сектора, а именно границы между секторами,
-            // тогда вместо midpoint нужен startAngleDeg:
-             {prepared.sectors.map((sector: RadialSector) => {
-                const end = getRadialGuideEnd(safeNumber(sector.startAngleDeg, 0), OUTER_RADIUS);
-
-                return (
-                    <line
-                    key={`boundary-${sector.key}`}
-                    x1={CENTER}
-                    y1={CENTER}
-                    x2={end.x}
-                    y2={end.y}
-                    stroke="#9ca3af"
-                    strokeOpacity={0.5}
-                    strokeWidth={1}
-                    strokeLinecap="round"
-                    />
-                );
-                })} */}
+  return (
+    <path
+      key={sector.key}
+      d={path}
+      fill={getSubclusterColor(sector.index)}
+      fillOpacity={getSectorFillOpacity(variant)}
+      stroke={getSubclusterColor(sector.index)}
+      strokeOpacity={getSectorStrokeOpacity(variant)}
+      strokeWidth={getSectorStrokeWidth(variant)}
+    />
+  );
+})}
 
 
             {prepared.rings.map((ring) => {
