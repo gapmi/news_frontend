@@ -566,6 +566,26 @@ export default function ClusterRadialMap({
             );
             })}
 
+           {/* //Если делать не центральную ось сектора, а именно границы между секторами,
+            // тогда вместо midpoint нужен startAngleDeg:
+             {prepared.sectors.map((sector: RadialSector) => {
+                const end = getRadialGuideEnd(safeNumber(sector.startAngleDeg, 0), OUTER_RADIUS);
+
+                return (
+                    <line
+                    key={`boundary-${sector.key}`}
+                    x1={CENTER}
+                    y1={CENTER}
+                    x2={end.x}
+                    y2={end.y}
+                    stroke="#9ca3af"
+                    strokeOpacity={0.5}
+                    strokeWidth={1}
+                    strokeLinecap="round"
+                    />
+                );
+                })} */}
+
 
             {prepared.rings.map((ring) => {
             const radius = (ring.inner + ring.outer) / 2;
