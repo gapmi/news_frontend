@@ -137,6 +137,149 @@ function getSubclusterColor(index: number) {
   return palette[Math.abs(index) % palette.length];
 }
 
+function getRingColor(ring: RadialRing) {
+  switch (ring.key) {
+    case "core":
+      return "#ff0000"; // blue
+    case "mid":
+      return "#fffb00"; // green
+    case "edge":
+      return "#3bfd00"; // violet
+    case "outlier_risk":
+      return "#00ffee"; // amber
+    default:
+      return "#616161"; // slate fallback
+  }
+}
+
+function getRingStrokeOpacity(ring: RadialRing, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    switch (ring.key) {
+      case "core":
+        return 0.28;
+      case "mid":
+        return 0.24;
+      case "edge":
+        return 0.22;
+      case "outlier_risk":
+        return 0.26;
+      default:
+        return 0.2;
+    }
+  }
+
+  if (variant === "combined") {
+    switch (ring.key) {
+      case "core":
+        return 0.34;
+      case "mid":
+        return 0.28;
+      case "edge":
+        return 0.26;
+      case "outlier_risk":
+        return 0.3;
+      default:
+        return 0.24;
+    }
+  }
+
+  switch (ring.key) {
+    case "core":
+      return 0.36;
+    case "mid":
+      return 0.3;
+    case "edge":
+      return 0.28;
+    case "outlier_risk":
+      return 0.34;
+    default:
+      return 0.26;
+  }
+}
+
+function getRingFillOpacity(ring: RadialRing, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    switch (ring.key) {
+      case "core":
+        return 0.05;
+      case "mid":
+        return 0.04;
+      case "edge":
+        return 0.035;
+      case "outlier_risk":
+        return 0.05;
+      default:
+        return 0.03;
+    }
+  }
+
+  if (variant === "combined") {
+    switch (ring.key) {
+      case "core":
+        return 0.07;
+      case "mid":
+        return 0.05;
+      case "edge":
+        return 0.045;
+      case "outlier_risk":
+        return 0.06;
+      default:
+        return 0.04;
+    }
+  }
+
+  switch (ring.key) {
+    case "core":
+      return 0.08;
+    case "mid":
+      return 0.06;
+    case "edge":
+      return 0.05;
+    case "outlier_risk":
+      return 0.07;
+    default:
+      return 0.04;
+  }
+}
+
+
+
+function getPointStroke(point: RadialPoint) {
+  if (point.isOutlier) return "#7f1d1d";
+  if (point.isQuestionable) return "#9a3412";
+  if (point.isOutlierRisk) return "#92400e";
+  return "#ffffff";
+}
+
+
+function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-rays") {
+    return getSubclusterColor(point.sectorIndex);
+  }
+
+
+  if (variant === "subcluster-segments") {
+    return point.isCore ? "#2563eb" : "#94a3b8";
+  }
+
+
+  return getSubclusterColor(point.sectorIndex);
+}
+
+
+function getPointStrokeByVariant(point: RadialPoint, variant: RadialMapVariant) {
+  if (variant === "subcluster-segments") {
+    return point.isCore ? "#ffffff" : "#cbd5e1";
+  }
+
+
+  if (variant === "combined") {
+    return getPointStroke(point);
+  }
+
+
+  return getPointStroke(point);
+}
 
 
 function getSectorFillOpacity(variant: RadialMapVariant) {
@@ -160,21 +303,6 @@ function getSectorStrokeWidth(variant: RadialMapVariant) {
 }
 
 
-function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
-  if (variant === "subcluster-rays") {
-    return getSubclusterColor(point.sectorIndex);
-  }
-
-
-  if (variant === "subcluster-segments") {
-    return point.isCore ? "#2563eb" : "#94a3b8";
-  }
-
-
-  return getSubclusterColor(point.sectorIndex);
-}
-
-
 function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-segments") {
     if (point.isCore) return 0.92;
@@ -193,21 +321,6 @@ function getPointFillOpacity(point: RadialPoint, variant: RadialMapVariant) {
 
 
   return getPointOpacity(point);
-}
-
-
-function getPointStrokeByVariant(point: RadialPoint, variant: RadialMapVariant) {
-  if (variant === "subcluster-segments") {
-    return point.isCore ? "#ffffff" : "#cbd5e1";
-  }
-
-
-  if (variant === "combined") {
-    return getPointStroke(point);
-  }
-
-
-  return getPointStroke(point);
 }
 
 
@@ -259,14 +372,6 @@ function getPointOpacity(point: RadialPoint) {
   if (point.isEdge) return 0.84;
   if (point.isCore) return 0.92;
   return 0.8;
-}
-
-
-function getPointStroke(point: RadialPoint) {
-  if (point.isOutlier) return "#7f1d1d";
-  if (point.isQuestionable) return "#9a3412";
-  if (point.isOutlierRisk) return "#92400e";
-  return "#ffffff";
 }
 
 
@@ -531,25 +636,25 @@ export default function ClusterRadialMap({
 
 
             {prepared.rings.map((ring) => {
-              const radius = (ring.inner + ring.outer) / 2;
-              const width = Math.max(1, ring.outer - ring.inner);
+            const radius = (ring.inner + ring.outer) / 2;
+            const width = Math.max(1, ring.outer - ring.inner);
+            const ringColor = getRingColor(ring);
 
+            if (!Number.isFinite(radius) || radius <= 0) return null;
 
-              if (!Number.isFinite(radius) || radius <= 0) return null;
-
-
-              return (
+            return (
                 <circle
-                  key={ring.key}
-                  cx={CENTER}
-                  cy={CENTER}
-                  r={radius}
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth={width}
-                  strokeOpacity={0.72}
+                key={ring.key}
+                cx={CENTER}
+                cy={CENTER}
+                r={radius}
+                fill="none"
+                stroke={ringColor}
+                strokeWidth={Math.max(2, width * 0.22)}
+                strokeOpacity={0.9}
+                strokeDasharray="6 6"
                 />
-              );
+            );
             })}
 
 
