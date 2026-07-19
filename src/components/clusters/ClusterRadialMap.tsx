@@ -116,22 +116,32 @@ function describeArc(
 }
 
 
-function getSubclusterColor(index: number) {
-  const palette = [
-    "#2563eb",
-    "#dc2626",
-    "#16a34a",
-    "#ca8a04",
-    "#7c3aed",
-    "#db2777",
-    "#ea580c",
-    "#0891b2",
-    "#4f46e5",
-    "#059669",
-    "#9333ea",
-    "#0f766e",
-  ];
-  return palette[Math.abs(index) % palette.length];
+// function getSubclusterColor(index: number) {
+//   const palette = [
+//     "#2563eb",
+//     "#dc2626",
+//     "#16a34a",
+//     "#ca8a04",
+//     "#7c3aed",
+//     "#db2777",
+//     "#ea580c",
+//     "#0891b2",
+//     "#4f46e5",
+//     "#059669",
+//     "#9333ea",
+//     "#0f766e",
+//   ];
+//   return palette[Math.abs(index) % palette.length];
+// }
+
+function getSubclusterFillColor(index: number) {
+  const hue = (Math.abs(index) * 137.508) % 360;
+  return `hsl(${hue}, 65%, 84%)`;
+}
+
+function getSubclusterStrokeColor(index: number) {
+  const hue = (Math.abs(index) * 137.508) % 360;
+  return `hsl(${hue}, 55%, 58%)`;
 }
 
 
@@ -145,7 +155,7 @@ function getPointStroke(point: RadialPoint) {
 
 function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
   if (variant === "subcluster-rays") {
-    return getSubclusterColor(point.sectorIndex);
+    return getSubclusterFillColor(point.sectorIndex);
   }
 
 
@@ -154,7 +164,7 @@ function getPointFill(point: RadialPoint, variant: RadialMapVariant) {
   }
 
 
-  return getSubclusterColor(point.sectorIndex);
+  return getSubclusterFillColor(point.sectorIndex);
 }
 
 
@@ -506,9 +516,9 @@ export default function ClusterRadialMap({
     <path
       key={sector.key}
       d={path}
-      fill={getSubclusterColor(sector.index)}
+      fill={getSubclusterFillColor(sector.index)}
       fillOpacity={getSectorFillOpacity(variant)}
-      stroke={getSubclusterColor(sector.index)}
+      stroke={getSubclusterStrokeColor(sector.index)}
       strokeOpacity={getSectorStrokeOpacity(variant)}
       strokeWidth={getSectorStrokeWidth(variant)}
     />
