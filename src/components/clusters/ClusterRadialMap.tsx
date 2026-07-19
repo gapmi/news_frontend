@@ -610,6 +610,8 @@ export default function ClusterRadialMap({
         </div>
 
 
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border bg-card/40 p-3">
         <div className="rounded-xl border bg-card/40 p-3">
         <div className="text-sm font-medium">Legend</div>
         <div className="mt-3 space-y-2 text-sm">
@@ -623,7 +625,8 @@ export default function ClusterRadialMap({
             </div>
             ))}
         </div>
-        </div>
+    </div>
+          </div>
 
 
           <div className="rounded-xl border bg-card/40 p-3">
