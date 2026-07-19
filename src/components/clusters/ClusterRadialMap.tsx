@@ -610,32 +610,20 @@ export default function ClusterRadialMap({
         </div>
 
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border bg-card/40 p-3">
-            <div className="text-sm font-medium">Legend</div>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-blue-600" />
-                <span>Core</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-violet-600" />
-                <span>Edge</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-amber-600" />
-                <span>Outlier risk</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-orange-600" />
-                <span>Questionable</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-red-600" />
-                <span>Outlier</span>
-              </div>
+        <div className="rounded-xl border bg-card/40 p-3">
+        <div className="text-sm font-medium">Legend</div>
+        <div className="mt-3 space-y-2 text-sm">
+            {prepared.sectors.slice(0, 8).map((sector) => (
+            <div key={sector.key} className="flex items-center gap-2">
+                <span
+                className="h-3 w-3 rounded-full border"
+                style={{ backgroundColor: getSubclusterFillColor(sector.index) }}
+                />
+                <span>{sector.label ?? sector.key}</span>
             </div>
-          </div>
+            ))}
+        </div>
+        </div>
 
 
           <div className="rounded-xl border bg-card/40 p-3">
